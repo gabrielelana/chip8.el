@@ -1,4 +1,4 @@
-;;; chip8.el --- A CHIP-8 emulator written in Emacs Lisp running in Emacs -*- lexical-binding: t -*-
+;;; chip8.el --- A CHIP-8 emulator written in EmacsLisp running in Emacs -*- lexical-binding: t -*-
 
 ;; Author: Gabriele Lana <gabriele.lana@gmail.com>
 ;; Maintainer: Gabriele Lana <gabriele.lana@gmail.com>
@@ -24,13 +24,350 @@
 
 ;;; Commentary:
 
-;; A CHIP-8 emulator written in Emacs Lisp running in Emacs
+;; A CHIP-8 emulator written in EmacsLisp running in Emacs
 
 ;;; Code:
 
+(require 'cl-lib)
+(require 'retro)
+
+;;; TODO: remove
 (defun chip8/example ()
   "This is an example."
   2)
+
+;;; TODO: will be variables in chip8 data structure when support for SUPER-CHIP
+(defconst chip8/SCREEN-WIDTH 64)
+(defconst chip8/SCREEN-HEIGHT 32)
+
+(defconst chip8/RAM-SIZE 4096)
+
+;;; TODO: should be variables? Some games have different bicolors
+(defconst chip8/COLORS [(#x00 #x00 #x00) (#xFF #xFF #xFF)]
+  "List of colors supported by the emulator, they are indexed starting from zero.")
+
+(defconst chip8/BUFFER-NAME "*CHIP8-EMULATOR*")
+
+(defconst chip8/FONT-ADDRESS #x50
+  "Address where to find/load default font in RAM.")
+
+(defconst chip8/ROM-ADDRESS #x200
+  "Address where to find/load ROM to execute in RAM.")
+
+(defconst chip8/FONT [ #xF0 #x90 #x90 #x90 #xF0 ; 0
+                       #x20 #x60 #x20 #x20 #x70 ; 1
+                       #xF0 #x10 #xF0 #x80 #xF0 ; 2
+                       #xF0 #x10 #xF0 #x10 #xF0 ; 3
+                       #x90 #x90 #xF0 #x10 #x10 ; 4
+                       #xF0 #x80 #xF0 #x10 #xF0 ; 5
+                       #xF0 #x80 #xF0 #x90 #xF0 ; 6
+                       #xF0 #x10 #x20 #x40 #x40 ; 7
+                       #xF0 #x90 #xF0 #x90 #xF0 ; 8
+                       #xF0 #x90 #xF0 #x10 #xF0 ; 9
+                       #xF0 #x90 #xF0 #x90 #x90 ; A
+                       #xE0 #x90 #xE0 #x90 #xE0 ; B
+                       #xF0 #x80 #x80 #x80 #xF0 ; C
+                       #xE0 #x90 #x90 #x90 #xE0 ; D
+                       #xF0 #x80 #xF0 #x80 #xF0 ; E
+                       #xF0 #x80 #xF0 #x80 #x80 ; F
+                       ]
+  "Default font loaded as sprites in CHIP-8 RAM.")
+
+(defvar chip8--current-rom-filename nil)
+(defvar chip8--current-instance nil)
+
+(defvar chip8-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "q") #'chip8-quit)
+    map)
+  "Keymap for `chip8-mode'.")
+
+(cl-defstruct chip8
+  (ram (make-vector chip8/RAM-SIZE 0) :documentation "4K of ram")
+  (v (make-vector 16 0) :documentation "General purpose registers, 8 bits")
+  (i 0 :documentation "Index register, 16 bits")
+  (pc 0 :documentation "Program counter, 16 bits")
+  (stack '() :documentation "Stack")
+  (delay-timer 0 :documentation "Delay timer")
+  (sound-timer 0 :documentation "Sound timer")
+  (keys (make-vector 16 0) :documentation "Keypad 16 current keys status representation")
+  (current-canvas nil :documentation "Current retro.el canvas, display representation")
+  (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el"))
+
+(define-derived-mode chip8-mode nil "CHIP-8 Emulator"
+  (use-local-map chip8-mode-map)
+  (setq chip8--current-instance (chip8--setup chip8--current-rom-filename t))
+  (run-at-time 0.001 nil 'chip8--run))
+
+(defun chip8 (filename)
+  "Run chip8 emulation of FILENAME rom."
+  (interactive "ffilename: ")
+  (select-window (or (get-buffer-window chip8/BUFFER-NAME)
+                     (selected-window)))
+  (switch-to-buffer chip8/BUFFER-NAME)
+  (setq chip8--current-rom-filename filename)
+  (chip8-mode))
+
+(defun chip8-quit ()
+  "Quit current game if any."
+  (interactive)
+  (setq chip8--current-instance nil)
+  (kill-buffer chip8/BUFFER-NAME))
+
+(defun chip8--setup (filename switch-to-buffer-p)
+  "Setup game with rom FILENAME.
+
+Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
+  (retro--init-color-palette chip8/COLORS 0)
+  (let ((ram (make-vector chip8/RAM-SIZE 0))
+        (canvas (chip8--setup-buffer
+                 chip8/BUFFER-NAME
+                 chip8/SCREEN-WIDTH
+                 chip8/SCREEN-HEIGHT
+                 0
+                 switch-to-buffer-p)))
+    (chip8--load-default-font ram)
+    (chip8--load-rom filename ram)
+    (make-chip8
+     :pc chip8/ROM-ADDRESS
+     :ram ram
+     :current-canvas canvas
+     :previous-canvas (retro-canvas-copy canvas))))
+
+(defun chip8--load-default-font (ram)
+  "Load default font in CHIP-8 RAM."
+  (dotimes (i (length chip8/FONT))
+    (aset ram (+ i chip8/FONT-ADDRESS) (aref chip8/FONT i))))
+
+(defun chip8--load-rom (filename ram)
+  "Load rom FILENAME in CHIP-8 RAM."
+  (when (or (not (file-exists-p filename)) (not (file-readable-p filename)))
+    (user-error "ROM file %s does not exists or is not readable" filename))
+  (let ((rom (seq-into
+              (with-temp-buffer
+                (set-buffer-multibyte nil)
+                (setq buffer-file-coding-system 'binary)
+                (insert-file-contents-literally filename nil 0)
+                (buffer-substring-no-properties (point-min) (point-max)))
+              'vector)))
+    (dotimes (i (length rom))
+      (aset ram (+ i chip8/ROM-ADDRESS) (aref rom i)))))
+
+(defun chip8--run ()
+  "Make the current game run."
+  (let* ((buffer (get-buffer chip8/BUFFER-NAME)))
+    ;; it runs only when we are in the emulator buffer
+    (when (eq (current-buffer) buffer)
+      (when (not chip8--current-instance)
+        (error "Missing emulator instance, this should not happen"))
+      (chip8--step chip8--current-instance)
+      ;; TODO render canvas only if elapsed time >= 1/60 second
+      (retro--buffer-render (chip8-current-canvas chip8--current-instance)
+                            (chip8-previous-canvas chip8--current-instance))
+      (chip8--canvas-copy (chip8-current-canvas chip8--current-instance)
+                          (chip8-previous-canvas chip8--current-instance))
+      (cl-rotatef (chip8-current-canvas chip8--current-instance)
+                  (chip8-previous-canvas chip8--current-instance))
+      (run-at-time 0.001 nil 'chip8--run))))
+
+(defun chip8--step (emulator)
+  "Run a single step of fetch/decode of the EMULATOR."
+  (let* ((nimbles (chip8--fetch16 emulator))
+         (opcode (logand nimbles #xF000)))
+    ;; (message "fetch 0x%04X at 0x%04X" nimbles (chip8-pc emulator))
+    (cond
+     ((eq nimbles #x00E0)
+      ;; 00E0 - CLS
+      ;; Clear the display.
+      (retro--reset-canvas (chip8-current-canvas emulator))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq opcode #xA000)
+      ;; Annn - LD I, addr
+      ;; Set I = nnn.
+      (setf (chip8-i emulator) (logand nimbles #x0FFF))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq opcode #x6000)
+      ;; 6xkk - LD Vx, byte
+      ;; Set Vx = kk.
+      (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+            (logand nimbles #x00FF))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq opcode #xD000)
+      ;; Dxyn - DRW Vx, Vy, nibble
+      ;; Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+      (let* ((x (mod (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) chip8/SCREEN-WIDTH))
+             (y (mod (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)) chip8/SCREEN-HEIGHT))
+             (n (logand nimbles #x000F))
+             (sprite (chip8--read-bytes emulator n (chip8-i emulator))))
+        (when (chip8--draw-sprite emulator x y n sprite)
+          (setf (aref (chip8-v emulator) #xF) #x1))
+        (cl-incf (chip8-pc emulator) 2)))
+     ((eq opcode #x7000)
+      ;; 7xkk - ADD Vx, byte
+      ;; Set Vx = Vx + kk.
+      (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+            (+ (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+               (logand nimbles #x00FF)))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq opcode #x1000)
+      ;; 1nnn - JP addr
+      ;; Jump to location nnn.
+      (setf (chip8-pc emulator) (logand nimbles #x0FFF)))
+     (t (message "opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))
+        (chip8-quit)))))
+
+(defun chip8--draw-sprite (emulator x y n sprite)
+  "Draw SPRITE made of N bytes on EMULATOR's canvas at coordinates (X, Y).
+
+A sprite is 8 pixel wide and N pixel tall (where N is the number
+fo bytes), every byte is a line of the sprite, every bit of the
+byte is a pixel, if the bit is 1 then we need to turn \"on\" the
+corresponding pixel, otherwise we need to turn it \"off\".
+
+Returns a boolean value indicating if there was a collision (aka
+if any pixel on the CANVAS was turned off)."
+  (let ((collision? nil)
+        (pixels-in-sprite (* n 8))
+        (canvas-pixels (retro-canvas-pixels (chip8-current-canvas emulator)))
+        (canvas-width (retro-canvas-width (chip8-current-canvas emulator)))
+        sprite-index
+        canvas-pixel
+        sprite-pixel)
+    (dotimes (yd n)
+      (dotimes (xd 8)
+        (setq canvas-pixel (chip8--get-pixel (+ x xd) (+ y yd) canvas-pixels canvas-width)
+              sprite-index (- pixels-in-sprite 1 (+ xd (* yd 8)))
+              sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
+        (when (and canvas-pixel sprite-pixel)
+          (setq collision? t))
+        (retro--plot-pixel
+         (+ x xd)
+         (+ y yd)
+         (logxor canvas-pixel sprite-pixel)
+         canvas-pixels
+         canvas-width)))
+    collision?))
+
+(defun chip8--fetch16 (emulator)
+  "Fetch 16 bits from EMULATOR's RAM at PC."
+  (let ((ram (chip8-ram emulator)))
+    (logior (ash (aref ram (chip8-pc emulator)) 8)
+            (aref ram (1+ (chip8-pc emulator))))))
+
+(defun chip8--read-bytes (emulator n address)
+  "Fetch N bytes from EMULATOR's RAM at ADDRESS."
+  (let ((bytes 0))
+    (dotimes (i n)
+      (setq bytes (logior (ash bytes 8)
+                          (aref (chip8-ram emulator) (+ i address)))))
+    bytes))
+
+
+;;; TODO: move to retro
+;;; TODO: retro--get-pixel
+;;; TODO: retro--get-pixel-canvas
+(defun chip8--get-pixel (x y pixels width)
+  "Get pixel color at (X, Y) in PIXELS with a certain WIDTH."
+  (aref pixels (+ (* y width) x)))
+
+;;; TODO: move to retro
+;;; TODO: retro--canvas-pixels-copy
+(defun chip8--canvas-copy (from to)
+  "Copy pixels in canvas FROM to pixels in canvas TO."
+  (setf (retro-canvas-pixels to) (copy-sequence (retro-canvas-pixels from))))
+
+;;; TODO: move to retro
+;;; TODO: retro-init-buffer or something
+(defun chip8--setup-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
+  "Setup buffer BUFFER-NAME as retro.el requires.
+
+Will return a retro.el canvas ready to be used as screen with
+retro.el primitives.
+
+Canvas will be initialized with a screen width SCREEN-WIDTH,
+SCREEN-HEIGHT and a background color with index BACKGROUND-COLOR.
+
+When setup is completed will switch to BUFFER-NAME
+if SWITCH-TO-BUFFER-P is \\='t'."
+  (select-window (or (get-buffer-window buffer-name)
+                     (selected-window)))
+  (with-current-buffer (get-buffer-create buffer-name)
+    (let* ((window (selected-window))
+           ;; NOTE: without switching to buffer, buffer calibration is not
+           ;; reliable, I didn't find a way to make it work but since we don't
+           ;; need precision because we are not looking at the buffer, a dummy
+           ;; but credible calibration will do
+           (calibration (if switch-to-buffer-p
+                            (retro--calibrate-canvas-in-window
+                             screen-width
+                             screen-height
+                             window)
+                          (list 10 screen-width screen-height)))
+           (pixel-size (nth 0 calibration))
+           (window-width (nth 1 calibration))
+           (window-height (nth 2 calibration)))
+      (when (not calibration) (error "Failed to calibrate pixel size in buffer %s" buffer-name))
+      (set-face-attribute 'retro-default-face nil :height pixel-size)
+      (buffer-face-set 'retro-default-face)
+      (let* ((margin-top (/ (- window-height screen-height) 2))
+             (margin-left (/ (- window-width screen-width) 2))
+             (canvas (retro-canvas-create :margin-left margin-left
+                                          :margin-top margin-top
+                                          :width screen-width
+                                          :height screen-height
+                                          :background-color background-color))
+             (margin-top-string (propertize (make-string (+ margin-left screen-width) 32) 'face 'default))
+             (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
+             (canvas-string (propertize (make-string screen-width 32) 'face (aref retro-palette-faces background-color))))
+        (dotimes (_ margin-top)
+          (insert margin-top-string)
+          (insert "\n"))
+        (dotimes (_ screen-height)
+          (insert margin-left-string)
+          (insert canvas-string)
+          (insert "\n"))
+        (setq-local buffer-read-only t
+                    visible-cursor nil
+                    cursor-type nil
+                    inhibit-modification-hooks t
+                    inhibit-compacting-font-caches t
+                    bidi-inhibit-bpa t
+                    bidi-display-reordering nil
+                    bidi-paragraph-direction 'left-to-right
+                    buffer-read-only nil
+                    mode-line-format nil)
+        (when switch-to-buffer-p
+          (switch-to-buffer buffer-name))
+        canvas))))
+
+;; (let ((sprite (logior (ash #x80 32)
+;;                       (ash #xFF 24)
+;;                       (ash #xFF 16)
+;;                       (ash #xFF 8)
+;;                       #x01)))
+;;   (list
+;;    (format "0x%04X" sprite)
+;;    (ash (logand sprite (ash #x01 39)) -39)
+;;    (ash (logand sprite (ash #x01 38)) -38)
+;;    (ash (logand sprite (ash #x01 37)) -37)
+;;    (ash (logand sprite (ash #x01 1)) -1)
+;;    (ash (logand sprite (ash #x01 0)) 0)
+;;    ))
+
+;; (let ((rom (with-temp-buffer
+;;              (set-buffer-multibyte nil)
+;;              (setq buffer-file-coding-system 'binary)
+;;              (insert-file-contents-literally "./roms/ibm-logo.ch8" nil 0)
+;;              (buffer-substring-no-properties (point-min) (point-max)))))
+;;   (seq-into rom 'vector))
+
+;; (defun chip8--setup-colors (colors)
+;;   "Setup COLORS as retro.el requires.
+
+;; COLORS is a vector of list of RGBs like
+;; \\='[(#x00 #x00 #x00) (#xFF #xFF #xFF)]'."
+;;   )
+
 
 (provide 'chip8)
 
