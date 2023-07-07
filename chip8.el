@@ -290,7 +290,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x1E)
           ;; Fx1E - ADD I, Vx
           ;; Set I = I + Vx.
-          (setf (chip8-i emulator) (logand (+ (chip8-i emulator) (chip8--vx emulator nimbles))
+          (setf (chip8-i emulator) (logand (+ (chip8-i emulator)
+                                              (chip8--vx emulator nimbles))
                                            #xFFFF))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x65)
@@ -343,47 +344,48 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-nimble #x4)
           ;; 8xy4 - ADD Vx, Vy
           ;; Set Vx = Vx + Vy, set VF = carry.
-          (let ((res (+ (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))))
-            (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) (logand res #xFF))
-            (when (not (eq res (logand res #xFF)))
-              (setf (aref (chip8-v emulator) #xF) #x1)))
+          (let ((res (+ (chip8--vx emulator nimbles)
+                        (chip8--vy emulator nimbles))))
+            (setf
+             (chip8--vx emulator nimbles) (logand res #xFF)
+             (aref (chip8-v emulator) #xF) (if (not (eq res (logand res #xFF)))
+                                               #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x5)
           ;; 8xy5 - SUB Vx, Vy
           ;; Set Vx = Vx - Vy, set VF = NOT borrow.
-          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                (- (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                   (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
-          (when (> (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                   (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
-            (setf (aref (chip8-v emulator) #xF) #x1))
+          (let ((vx (chip8--vx emulator nimbles))
+                (vy (chip8--vy emulator nimbles)))
+            (setf (chip8--vx emulator nimbles) (chip8--complement-byte (- vx vy))
+                  (aref (chip8-v emulator) #xF) (if (> vx vy) #x1 #x0)))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x7)
+          ;; 8xy7 - SUBN Vx, Vy
+          ;; Set Vx = Vy - Vx, set VF = NOT borrow.
+          (let ((vx (chip8--vx emulator nimbles))
+                (vy (chip8--vy emulator nimbles)))
+            (setf (chip8--vx emulator nimbles) (chip8--complement-byte (- vy vx))
+                  (aref (chip8-v emulator) #xF) (if (> vy vx) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x6)
           ;; 8xy6 - SHR Vx {, Vy}
           ;; Set Vx = Vx SHR 1.
           ;; If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
           ;; Then Vx is divided by 2.
-          (setf (aref (chip8-v emulator) #xF) (logand (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) #x1)
-                (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) (ash (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) -1))
+          ;; TODO: in some platforms Vx = Vy as first operation
+          (let ((vx (chip8--vx emulator nimbles)))
+            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vx -1))
+                  (aref (chip8-v emulator) #xF) (if (> (logand vx #x01) 0) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #xE)
           ;; 8xyE - SHL Vx {, Vy}
           ;; Set Vx = Vx SHL 1.
           ;; If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
           ;; Then Vx is multiplied by 2.
-          (setf (aref (chip8-v emulator) #xF) (logand (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) #x80)
-                (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) (ash (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) 1))
-          (cl-incf (chip8-pc emulator) 2))
-         ((eq last-nimble #x7)
-          ;; 8xy7 - SUBN Vx, Vy
-          ;; Set Vx = Vy - Vx, set VF = NOT borrow.
-          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                (- (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))
-                   (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))))
-          (when (> (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))
-                   (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)))
-            (setf (aref (chip8-v emulator) #xF) #x1))
+          ;; TODO: in some platforms Vx = Vy as first operation
+          (let ((vx (chip8--vx emulator nimbles)))
+            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vx 1))
+                  (aref (chip8-v emulator) #xF) (if (> (logand vx #x80) 0) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      ((eq nimbles #x00EE)
@@ -462,6 +464,16 @@ Split decimal value of X in a list of its digits."
       (setq res (cons (mod x 10) res)
             x (floor (/ x 10))))
     res))
+
+(defun chip8--complement-byte (x)
+  "Represent X in binary complement.
+
+It returns X if X is a non negative number. It returns binary
+complement of X if X is a negative number."
+  (logand #xFF
+          (if (< x 0)
+              (+ #x100 x)
+            x)))
 
 ;; (chip8--to-bdc 192)
 ;; (chip8--to-bdc 1946)
