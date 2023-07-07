@@ -43,7 +43,9 @@
 (defconst chip8/RAM-SIZE 4096)
 
 ;;; TODO: should be variables? Some games have different bicolors
-(defconst chip8/COLORS [(#x00 #x00 #x00) (#xFF #xFF #xFF)]
+(defconst chip8/COLORS
+  ;; [(#x00 #x00 #x00) (#xFF #xFF #xFF)]
+  [(#x99 #x66 #x01) (#xFF #xCC #x01)]
   "List of colors supported by the emulator, they are indexed starting from zero.")
 
 (defconst chip8/BUFFER-NAME "*CHIP8-EMULATOR*")
@@ -107,6 +109,24 @@
   (switch-to-buffer chip8/BUFFER-NAME)
   (setq chip8--current-rom-filename filename)
   (chip8-mode))
+
+(defmacro chip8--vx (emulator nimbles)
+  "Given instruction NIMBLES get the Vx register of EMULATOR.
+
+In most of the instructions the reference of the register name as
+X is the second nimble (ex 3xKK). We take the reference of the
+name of the register from the second nimble and then we return
+the PLACE of this register in EMULATOR."
+  `(aref (chip8-v ,emulator) (ash (logand ,nimbles #x0F00) -8)))
+
+(defmacro chip8--vy (emulator nimbles)
+  "Given instruction NIMBLES get the Vy register of EMULATOR.
+
+In most of the instructions the reference of the register name as
+Y is the third nimble (ex 5xy0). We take the reference of the
+name of the register from the third nimble and then we return
+the PLACE of this register in EMULATOR."
+  `(aref (chip8-v ,emulator) (ash (logand ,nimbles #x00F0) -4)))
 
 (defun chip8-quit ()
   "Quit current game if any."
@@ -174,7 +194,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
   "Run a single step of fetch/decode of the EMULATOR."
   (let* ((nimbles (chip8--fetch16 emulator))
          (opcode (logand nimbles #xF000)))
-    ;; (message "fetch 0x%04X at 0x%04X" nimbles (chip8-pc emulator))
+    ;; (message "fetch 0x%04X at 0x%04X (stack: %S)" nimbles (chip8-pc emulator) (seq-map (lambda (x) (format "0x%04X" x)) (chip8-stack emulator)))
     (cond
      ((eq nimbles #x00E0)
       ;; 00E0 - CLS
@@ -213,8 +233,166 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; 1nnn - JP addr
       ;; Jump to location nnn.
       (setf (chip8-pc emulator) (logand nimbles #x0FFF)))
-     (t (message "opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))
-        (chip8-quit)))))
+     ((eq opcode #x3000)
+      ;; 3xkk - SE Vx, byte
+      ;; Skip next instruction if Vx = kk.
+      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+              (logand nimbles #x00FF))
+          (cl-incf (chip8-pc emulator) 4)
+        (cl-incf (chip8-pc emulator) 2)))
+     ((eq opcode #x4000)
+      ;; 4xkk - SNE Vx, byte
+      ;; Skip next instruction if Vx != kk.
+      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+              (logand nimbles #x00FF))
+          (cl-incf (chip8-pc emulator) 2)
+        (cl-incf (chip8-pc emulator) 4)))
+     ((eq opcode #x5000)
+      ;; 5xy0 - SE Vx, Vy
+      ;; Skip next instruction if Vx = Vy.
+      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+              (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+          (cl-incf (chip8-pc emulator) 4)
+        (cl-incf (chip8-pc emulator) 2)))
+     ((eq opcode #x9000)
+      ;; 9xy0 - SNE Vx, Vy
+      ;; Skip next instruction if Vx != Vy.
+      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+              (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+          (cl-incf (chip8-pc emulator) 2)
+        (cl-incf (chip8-pc emulator) 4)))
+     ((eq opcode #x2000)
+      ;; 2nnn - CALL addr
+      ;; Call subroutine at nnn.
+      ;; The interpreter increments the stack pointer, then puts the current PC
+      ;; on the top of the stack. The PC is then set to nnn.
+      (push (+ (chip8-pc emulator) 2) (chip8-stack emulator))
+      (setf (chip8-pc emulator) (logand nimbles #x0FFF)))
+     ((eq opcode #xF000)
+      (let ((last-byte (logand nimbles #x00FF)))
+        (cond
+         ((eq last-byte #x15)
+          ;; Fx15 - LD DT, Vx
+          ;; Set delay timer = Vx.
+          (setf (chip8-delay-timer emulator) (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x33)
+          ;; Fx33 - LD B, Vx
+          ;; Store BCD representation of Vx in memory locations I, I+1, and I+2.
+          ;; The interpreter takes the decimal value of Vx, and places the hundreds
+          ;; digit in memory at location in I, the tens digit at location I+1, and
+          ;; the ones digit at location I+2.
+          (let ((digits (chip8--to-bdc (chip8--vx emulator nimbles)))
+                (ri (chip8-i emulator)))
+            (dotimes (i (length digits))
+              (chip8--write-bytes emulator (nth i digits) 1 (+ ri i))))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x1E)
+          ;; Fx1E - ADD I, Vx
+          ;; Set I = I + Vx.
+          (setf (chip8-i emulator) (logand (+ (chip8-i emulator) (chip8--vx emulator nimbles))
+                                           #xFFFF))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x65)
+          ;; Fx65 - LD Vx, [I]
+          ;; Read registers V0 through Vx from memory starting at location I.
+          (let ((vx (mod (chip8--vx emulator nimbles) #xF))
+                (ri (chip8-i emulator)))
+            (cl-loop for i from 0 to vx
+                     do (setf (aref (chip8-v emulator) i) (chip8--read-bytes emulator 1 (+ ri i)))))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x55)
+          ;; Fx55 - LD [I], Vx
+          ;; Store registers V0 through Vx in memory starting at location I.
+          (let ((vx (mod (chip8--vx emulator nimbles) #xF))
+                (ri (chip8-i emulator)))
+            (cl-loop for i from 0 to vx
+                     do (chip8--write-bytes emulator (aref (chip8-v emulator) i) 1 (+ ri i))))
+          (cl-incf (chip8-pc emulator) 2))
+         (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
+     ((eq opcode #x8000)
+      (let ((last-nimble (logand nimbles #x000F)))
+        (cond
+         ((eq last-nimble #x0)
+          ;; 8xy0 - LD Vx, Vy
+          ;; Set Vx = Vy.
+          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x1)
+          ;; 8xy1 - OR Vx, Vy
+          ;; Set Vx = Vx OR Vy.
+          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                (logior (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x2)
+          ;; 8xy2 - AND Vx, Vy
+          ;; Set Vx = Vx AND Vy.
+          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                (logand (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x3)
+          ;; 8xy3 - XOR Vx, Vy
+          ;; Set Vx = Vx XOR Vy.
+          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                (logxor (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x4)
+          ;; 8xy4 - ADD Vx, Vy
+          ;; Set Vx = Vx + Vy, set VF = carry.
+          (let ((res (+ (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))))
+            (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) (logand res #xFF))
+            (when (not (eq res (logand res #xFF)))
+              (setf (aref (chip8-v emulator) #xF) #x1)))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x5)
+          ;; 8xy5 - SUB Vx, Vy
+          ;; Set Vx = Vx - Vy, set VF = NOT borrow.
+          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                (- (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                   (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (when (> (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                   (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+            (setf (aref (chip8-v emulator) #xF) #x1))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x6)
+          ;; 8xy6 - SHR Vx {, Vy}
+          ;; Set Vx = Vx SHR 1.
+          ;; If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
+          ;; Then Vx is divided by 2.
+          (setf (aref (chip8-v emulator) #xF) (logand (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) #x1)
+                (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) (ash (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) -1))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #xE)
+          ;; 8xyE - SHL Vx {, Vy}
+          ;; Set Vx = Vx SHL 1.
+          ;; If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
+          ;; Then Vx is multiplied by 2.
+          (setf (aref (chip8-v emulator) #xF) (logand (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) #x80)
+                (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) (ash (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) 1))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-nimble #x7)
+          ;; 8xy7 - SUBN Vx, Vy
+          ;; Set Vx = Vy - Vx, set VF = NOT borrow.
+          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+                (- (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))
+                   (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))))
+          (when (> (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))
+                   (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)))
+            (setf (aref (chip8-v emulator) #xF) #x1))
+          (cl-incf (chip8-pc emulator) 2))
+         (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
+     ((eq nimbles #x00EE)
+      ;; 00EE - RET
+      ;; Return from a subroutine.
+      ;; The interpreter sets the program counter to the address at the top of
+      ;; the stack, then subtracts 1 from the stack pointer.
+      (setf (chip8-pc emulator) (pop (chip8-stack emulator))))
+     (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
 
 (defun chip8--draw-sprite (emulator x y n sprite)
   "Draw SPRITE made of N bytes on EMULATOR's canvas at coordinates (X, Y).
@@ -255,13 +433,41 @@ if any pixel on the CANVAS was turned off)."
             (aref ram (1+ (chip8-pc emulator))))))
 
 (defun chip8--read-bytes (emulator n address)
-  "Fetch N bytes from EMULATOR's RAM at ADDRESS."
+  "Read N bytes from EMULATOR's RAM at ADDRESS."
   (let ((bytes 0))
     (dotimes (i n)
       (setq bytes (logior (ash bytes 8)
                           (aref (chip8-ram emulator) (+ i address)))))
     bytes))
 
+(defun chip8--write-bytes (emulator bytes n address)
+  "Write N BYTES to EMULATOR's RAM at ADDRESS."
+  ;; (message "chip8--write-bytes 0x%04X %d 0x%04X" bytes n address)
+  (let ((mask (ash #xFF (* (- n 1) 8))))
+    (dotimes (i n)
+      (setf (aref (chip8-ram emulator) (+ i address))
+            (ash (logand bytes mask) (- (* (- n i 1) 8))))
+      (setq mask (ash mask (- 8))))))
+
+(defun chip8--to-bdc (x)
+  "Encode X as Binary Encoded Decimal.
+
+Split decimal value of X in a list of its digits."
+  (when (< x 0)
+    (error "Cannot encode %d as BDC" x))
+  (let ((res '()))
+    (setq res (cons (mod x 10) res)
+          x (floor (/ x 10)))
+    (while (> x 0)
+      (setq res (cons (mod x 10) res)
+            x (floor (/ x 10))))
+    res))
+
+;; (chip8--to-bdc 192)
+;; (chip8--to-bdc 1946)
+;; (chip8--to-bdc 0)
+;; (chip8--to-bdc 01)
+;; (chip8--to-bdc 012)
 
 ;;; TODO: move to retro
 ;;; TODO: retro--get-pixel
@@ -368,6 +574,12 @@ if SWITCH-TO-BUFFER-P is \\='t'."
 ;; \\='[(#x00 #x00 #x00) (#xFF #xFF #xFF)]'."
 ;;   )
 
+;;; TODO: make a test with this
+;; (let ((emulator (make-chip8 :ram (make-vector 6 0))))
+;;   (chip8--write-bytes emulator #x04030201 4 0)
+;;   (message "%S" (chip8-ram emulator)))
+
+;; (message "Store registers 0x%04X through 0x%04X in memory starting at location 0x%04X (registers: %S)" 0 vx ri (seq-map (lambda (x) (format "0x%04X" x)) (chip8-v emulator)))
 
 (provide 'chip8)
 
