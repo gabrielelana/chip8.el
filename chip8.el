@@ -248,6 +248,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; The interpreter sets the program counter to the address at the top of
       ;; the stack, then subtracts 1 from the stack pointer.
       (setf (chip8-pc emulator) (pop (chip8-stack emulator))))
+     ((eq opcode #x0000)
+      ;; 0nnn - SYS addr
+      ;; Jump to a machine code routine at nnn.
+      ;; This instruction is only used on the old computers on which Chip-8 was originally
+      ;; implemented. It is ignored by modern interpreters.
+      (cl-incf (chip8-pc emulator) 2))
      ((eq opcode #xA000)
       ;; Annn - LD I, addr
       ;; Set I = nnn.
