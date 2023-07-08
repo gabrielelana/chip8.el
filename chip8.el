@@ -202,7 +202,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
 
 (defun chip8--load-rom (filename ram)
   "Load rom FILENAME in CHIP-8 RAM."
-  (when (or (not (file-exists-p filename)) (not (file-readable-p filename)))
+  (when (or (not (file-exists-p filename)) (not (file-readable-p filename)) (file-directory-p filename))
     (user-error "ROM file %s does not exists or is not readable" filename))
   (let ((rom (seq-into
               (with-temp-buffer
