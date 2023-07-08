@@ -315,6 +315,11 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; on the top of the stack. The PC is then set to nnn.
       (push (+ (chip8-pc emulator) 2) (chip8-stack emulator))
       (setf (chip8-pc emulator) (logand nimbles #x0FFF)))
+     ((eq opcode #xC000)
+      ;; Cxkk - RND Vx, byte
+      ;; Set Vx = random byte AND kk.
+      (setf (chip8--vx emulator nimbles) (logand (random 256) (logand nimbles #x00FF)))
+      (cl-incf (chip8-pc emulator) 2))
      ((eq opcode #xF000)
       (let ((last-byte (logand nimbles #x00FF)))
         (cond
