@@ -75,12 +75,36 @@
                        ]
   "Default font loaded as sprites in CHIP-8 RAM.")
 
+;;; TODO: documentation
 (defvar chip8--current-rom-filename nil)
+
+;;; TODO: documentation
 (defvar chip8--current-instance nil)
+
+;;; TODO: documentation
+(defvar chip8--current-key nil)
+(defvar chip8--current-key-timer nil)
+(defvar chip8--key-release-timeout 0.3)
 
 (defvar chip8-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "q") #'chip8-quit)
+    (define-key map (kbd "0") #'(lambda () (interactive) (chip8--key-press #x0)))
+    (define-key map (kbd "1") #'(lambda () (interactive) (chip8--key-press #x1)))
+    (define-key map (kbd "2") #'(lambda () (interactive) (chip8--key-press #x2)))
+    (define-key map (kbd "3") #'(lambda () (interactive) (chip8--key-press #x3)))
+    (define-key map (kbd "4") #'(lambda () (interactive) (chip8--key-press #x4)))
+    (define-key map (kbd "5") #'(lambda () (interactive) (chip8--key-press #x5)))
+    (define-key map (kbd "6") #'(lambda () (interactive) (chip8--key-press #x6)))
+    (define-key map (kbd "7") #'(lambda () (interactive) (chip8--key-press #x7)))
+    (define-key map (kbd "8") #'(lambda () (interactive) (chip8--key-press #x8)))
+    (define-key map (kbd "9") #'(lambda () (interactive) (chip8--key-press #x9)))
+    (define-key map (kbd "a") #'(lambda () (interactive) (chip8--key-press #xA)))
+    (define-key map (kbd "b") #'(lambda () (interactive) (chip8--key-press #xB)))
+    (define-key map (kbd "c") #'(lambda () (interactive) (chip8--key-press #xC)))
+    (define-key map (kbd "d") #'(lambda () (interactive) (chip8--key-press #xD)))
+    (define-key map (kbd "e") #'(lambda () (interactive) (chip8--key-press #xE)))
+    (define-key map (kbd "f") #'(lambda () (interactive) (chip8--key-press #xF)))
     map)
   "Keymap for `chip8-mode'.")
 
@@ -109,6 +133,23 @@
   (switch-to-buffer chip8/BUFFER-NAME)
   (setq chip8--current-rom-filename filename)
   (chip8-mode))
+
+(defun chip8--key-press (keycode)
+  "Will emulate the key press of KEYCODE in current EMULATOR."
+  (when (not (null chip8--current-key))
+    (message "Key release of 0x%04X because of key press" chip8--current-key)
+    (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)
+    (cancel-timer chip8--current-key-timer))
+  (message "Key press 0x%04X" keycode)
+  (aset (chip8-keys chip8--current-instance) keycode #x1)
+  (setq chip8--current-key keycode
+        chip8--current-key-timer (run-at-time chip8--key-release-timeout nil #'chip8--key-release)))
+
+(defun chip8--key-release ()
+  "Will emulate the key release of current pressed keycode in current EMULATOR."
+  (when chip8--current-key
+    (message "Key release of 0x%04X because of timeout" chip8--current-key)
+    (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)))
 
 (defmacro chip8--vx (emulator nimbles)
   "Given instruction NIMBLES get the Vx register of EMULATOR.
@@ -201,6 +242,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; Clear the display.
       (retro--reset-canvas (chip8-current-canvas emulator))
       (cl-incf (chip8-pc emulator) 2))
+     ((eq nimbles #x00EE)
+      ;; 00EE - RET
+      ;; Return from a subroutine.
+      ;; The interpreter sets the program counter to the address at the top of
+      ;; the stack, then subtracts 1 from the stack pointer.
+      (setf (chip8-pc emulator) (pop (chip8-stack emulator))))
      ((eq opcode #xA000)
       ;; Annn - LD I, addr
       ;; Set I = nnn.
@@ -271,6 +318,23 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #xF000)
       (let ((last-byte (logand nimbles #x00FF)))
         (cond
+         ((eq last-byte #x0A)
+          ;; Fx0A - LD Vx, K
+          ;; Wait for a key press, store the value of the key in Vx.
+          (let ((keys (chip8-keys emulator)))
+            (catch 'found
+              (dotimes (i #xF)
+                ;; (message "key 0x%04X is pressed? %d" i (aref keys i))
+                (when (> (aref keys i) 0)
+                  ;; One key is pressed, Vx = K, go to next instruction
+                  (setf (chip8--vx emulator nimbles) i)
+                  (cl-incf (chip8-pc emulator) 2)
+                  (throw 'found nil))))))
+         ((eq last-byte #x07)
+          ;; Fx07 - LD Vx, DT
+          ;; Set Vx = delay timer value.
+          (setf (chip8--vx emulator nimbles) (chip8-delay-timer emulator))
+          (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x15)
           ;; Fx15 - LD DT, Vx
           ;; Set delay timer = Vx.
@@ -388,12 +452,24 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
                   (aref (chip8-v emulator) #xF) (if (> (logand vx #x80) 0) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
-     ((eq nimbles #x00EE)
-      ;; 00EE - RET
-      ;; Return from a subroutine.
-      ;; The interpreter sets the program counter to the address at the top of
-      ;; the stack, then subtracts 1 from the stack pointer.
-      (setf (chip8-pc emulator) (pop (chip8-stack emulator))))
+     ((eq opcode #xE000)
+      (let ((last-byte (logand nimbles #x00FF)))
+        (cond
+         ((eq last-byte #x9E)
+          ;; Ex9E - SKP Vx
+          ;; Skip next instruction if key with the value of Vx is pressed.
+          ;; (message "registers: %S" (seq-map (lambda (x) (format "0x%04X" x)) (chip8-v emulator)))
+          ;; (message "register 0x%04X value is 0x%04X" (ash (logand #x0F00 nimbles) -8) (chip8--vx emulator nimbles))
+          (if (> (aref (chip8-keys emulator) (logand #xF (chip8--vx emulator nimbles))) 0)
+              (cl-incf (chip8-pc emulator) 4)
+            (cl-incf (chip8-pc emulator) 2)))
+         ((eq last-byte #xA1)
+          ;; ExA1 - SKNP Vx
+          ;; Skip next instruction if key with the value of Vx is not pressed.
+          (if (eq (aref (chip8-keys emulator) (chip8--vx emulator nimbles)) 0)
+              (cl-incf (chip8-pc emulator) 4)
+            (cl-incf (chip8-pc emulator) 2)))
+         (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
 
 (defun chip8--draw-sprite (emulator x y n sprite)
