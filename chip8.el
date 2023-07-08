@@ -271,9 +271,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       (let* ((x (mod (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) chip8/SCREEN-WIDTH))
              (y (mod (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)) chip8/SCREEN-HEIGHT))
              (n (logand nimbles #x000F))
-             (sprite (chip8--read-bytes emulator n (chip8-i emulator))))
-        (when (chip8--draw-sprite emulator x y n sprite)
-          (setf (aref (chip8-v emulator) #xF) #x1))
+             (sprite (chip8--read-bytes emulator n (chip8-i emulator)))
+             (hit? (chip8--draw-sprite emulator x y n sprite)))
+        (if hit? #x1 #x0)
         (cl-incf (chip8-pc emulator) 2)))
      ((eq opcode #x7000)
       ;; 7xkk - ADD Vx, byte
