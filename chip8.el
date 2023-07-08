@@ -118,7 +118,8 @@
   (sound-timer 0 :documentation "Sound timer")
   (keys (make-vector 16 0) :documentation "Keypad 16 current keys status representation")
   (current-canvas nil :documentation "Current retro.el canvas, display representation")
-  (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el"))
+  (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el")
+  (last-frame-at (current-time) :documentation "Timestamp when the last frame got rendered"))
 
 (define-derived-mode chip8-mode nil "CHIP-8 Emulator"
   (use-local-map chip8-mode-map)
@@ -216,19 +217,26 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
 
 (defun chip8--run ()
   "Make the current game run."
-  (let* ((buffer (get-buffer chip8/BUFFER-NAME)))
+  (let ((buffer (get-buffer chip8/BUFFER-NAME))
+         (current-canvas nil)
+         (previous-canvas nil)
+         (last-frame-at 0)
+         (elapsed 0))
     ;; it runs only when we are in the emulator buffer
     (when (eq (current-buffer) buffer)
       (when (not chip8--current-instance)
         (error "Missing emulator instance, this should not happen"))
-      (chip8--step chip8--current-instance)
-      ;; TODO render canvas only if elapsed time >= 1/60 second
-      (retro--buffer-render (chip8-current-canvas chip8--current-instance)
-                            (chip8-previous-canvas chip8--current-instance))
-      (chip8--canvas-copy (chip8-current-canvas chip8--current-instance)
-                          (chip8-previous-canvas chip8--current-instance))
-      (cl-rotatef (chip8-current-canvas chip8--current-instance)
-                  (chip8-previous-canvas chip8--current-instance))
+      (setq last-frame-at (chip8-last-frame-at chip8--current-instance)
+            current-canvas (chip8-current-canvas chip8--current-instance)
+            previous-canvas (chip8-previous-canvas chip8--current-instance))
+      (while (< elapsed 0.03)
+        (chip8--step chip8--current-instance)
+        (setq elapsed (float-time (time-subtract (current-time) last-frame-at)))
+        (sit-for 0.001 t))
+      ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
+      (retro--buffer-render current-canvas previous-canvas)
+      (chip8--canvas-copy current-canvas previous-canvas)
+      (setf (chip8-last-frame-at chip8--current-instance) (current-time))
       (run-at-time 0.001 nil 'chip8--run))))
 
 (defun chip8--step (emulator)
