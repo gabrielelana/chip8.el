@@ -385,8 +385,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Fx65 - LD Vx, [I]
           ;; Read registers V0 through Vx from memory starting at location I.
           ;; NOTE: x in Fx65 is a value that must be considered literally,
-          ;; F165 means to read registers V0 and V1
-          ;; F265 means to read registers V0, V1 and V2
+          ;; F165 means to read registers V0 from I and V1 from (I + 1)
+          ;; F265 means to read registers V0 from I, V1 from (I + 1) and V2 from (I + 2)
           (let ((vx (ash (logand nimbles #x0F00) -8))
                 (ri (chip8-i emulator)))
             (cl-loop for i from 0 to vx
