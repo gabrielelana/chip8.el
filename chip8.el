@@ -286,9 +286,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #x7000)
       ;; 7xkk - ADD Vx, byte
       ;; Set Vx = Vx + kk.
-      (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-            (+ (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-               (logand nimbles #x00FF)))
+      (setf (chip8--vx emulator nimbles) (logand #xFF (+ (chip8--vx emulator nimbles)
+                                                         (logand nimbles #x00FF))))
       (cl-incf (chip8-pc emulator) 2))
      ((eq opcode #x1000)
       ;; 1nnn - JP addr
