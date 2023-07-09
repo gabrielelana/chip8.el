@@ -358,6 +358,11 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set delay timer = Vx.
           (setf (chip8-delay-timer emulator) (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)))
           (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x29)
+          ;; Fx29 - LD F, Vx
+          ;; Set I = location of sprite for digit Vx.
+          (setf (chip8-i emulator) (+ chip8/FONT-ADDRESS (* (chip8--vx emulator nimbles) 5)))
+          (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x33)
           ;; Fx33 - LD B, Vx
           ;; Store BCD representation of Vx in memory locations I, I+1, and I+2.
