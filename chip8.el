@@ -485,9 +485,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x9E)
           ;; Ex9E - SKP Vx
           ;; Skip next instruction if key with the value of Vx is pressed.
-          ;; (message "registers: %S" (seq-map (lambda (x) (format "0x%04X" x)) (chip8-v emulator)))
-          ;; (message "register 0x%04X value is 0x%04X" (ash (logand #x0F00 nimbles) -8) (chip8--vx emulator nimbles))
-          (if (> (aref (chip8-keys emulator) (logand #xF (chip8--vx emulator nimbles))) 0)
+          (if (> (aref (chip8-keys emulator) (chip8--vx emulator nimbles)) 0)
               (cl-incf (chip8-pc emulator) 4)
             (cl-incf (chip8-pc emulator) 2)))
          ((eq last-byte #xA1)
