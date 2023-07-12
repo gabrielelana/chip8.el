@@ -138,10 +138,8 @@
 (defun chip8--key-press (keycode)
   "Will emulate the key press of KEYCODE in current EMULATOR."
   (when (not (null chip8--current-key))
-    (message "Key release of 0x%04X because of key press" chip8--current-key)
     (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)
     (cancel-timer chip8--current-key-timer))
-  (message "Key press 0x%04X" keycode)
   (aset (chip8-keys chip8--current-instance) keycode #x1)
   (setq chip8--current-key keycode
         chip8--current-key-timer (run-at-time chip8--key-release-timeout nil #'chip8--key-release)))
@@ -149,7 +147,6 @@
 (defun chip8--key-release ()
   "Will emulate the key release of current pressed keycode in current EMULATOR."
   (when chip8--current-key
-    (message "Key release of 0x%04X because of timeout" chip8--current-key)
     (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)))
 
 (defmacro chip8--vx (emulator nimbles)
@@ -349,7 +346,6 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           (let ((keys (chip8-keys emulator)))
             (catch 'found
               (dotimes (i #xF)
-                ;; (message "key 0x%04X is pressed? %d" i (aref keys i))
                 (when (> (aref keys i) 0)
                   ;; One key is pressed, Vx = K, go to next instruction
                   (setf (chip8--vx emulator nimbles) i)
