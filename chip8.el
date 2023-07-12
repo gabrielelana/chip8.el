@@ -238,13 +238,19 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       (chip8--canvas-copy current-canvas previous-canvas)
       (setf (chip8-last-frame-at chip8--current-instance) (current-time))
       (cl-decf (chip8-delay-timer chip8--current-instance))
+      (cl-decf (chip8-sound-timer chip8--current-instance))
       (run-at-time 0.001 nil 'chip8--run))))
 
 (defun chip8--step (emulator)
   "Run a single step of fetch/decode of the EMULATOR."
   (let* ((nimbles (chip8--fetch16 emulator))
          (opcode (logand nimbles #xF000)))
-    ;; (message "fetch 0x%04X at 0x%04X (stack: %S)" nimbles (chip8-pc emulator) (seq-map (lambda (x) (format "0x%04X" x)) (chip8-stack emulator)))
+    ;; (message "fetch 0x%04X at 0x%04X" nimbles (chip8-pc emulator))
+    ;; (message "fetch 0x%04X at 0x%04X (stack: %S) (keys: %S)"
+    ;;          nimbles
+    ;;          (chip8-pc emulator)
+    ;;          (seq-map (lambda (x) (format "0x%04X" x)) (chip8-stack emulator))
+    ;;          (seq-map (lambda (k) (if (> k 0) "#" ".")) (chip8-keys emulator)))
     (cond
      ((eq nimbles #x00E0)
       ;; 00E0 - CLS
@@ -358,6 +364,10 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Fx15 - LD DT, Vx
           ;; Set delay timer = Vx.
           (setf (chip8-delay-timer emulator) (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)))
+         ((eq last-byte #x18)
+          ;; Fx18 - LD ST, Vx
+          ;; Set sound timer = Vx.
+          (setf (chip8-sound-timer emulator) (chip8--vx emulator nimbles))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x29)
           ;; Fx29 - LD F, Vx
