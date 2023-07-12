@@ -283,12 +283,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #xD000)
       ;; Dxyn - DRW Vx, Vy, nibble
       ;; Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
-      (let* ((x (mod (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)) chip8/SCREEN-WIDTH))
-             (y (mod (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)) chip8/SCREEN-HEIGHT))
+      (let* ((x (mod (chip8--vx emulator nimbles) chip8/SCREEN-WIDTH))
+             (y (mod (chip8--vy emulator nimbles) chip8/SCREEN-HEIGHT))
              (n (logand nimbles #x000F))
              (sprite (chip8--read-bytes emulator n (chip8-i emulator)))
              (hit? (chip8--draw-sprite emulator x y n sprite)))
-        (if hit? #x1 #x0)
+        (setf (aref (chip8-v emulator) #xF) (if hit? #x1 #x0))
         (cl-incf (chip8-pc emulator) 2)))
      ((eq opcode #x7000)
       ;; 7xkk - ADD Vx, byte
@@ -524,17 +524,20 @@ if any pixel on the CANVAS was turned off)."
         (canvas-width (retro-canvas-width (chip8-current-canvas emulator)))
         sprite-index
         canvas-pixel
-        sprite-pixel)
+        sprite-pixel
+        xi yi)
     (dotimes (yd n)
       (dotimes (xd 8)
-        (setq canvas-pixel (chip8--get-pixel (+ x xd) (+ y yd) canvas-pixels canvas-width)
+        (setq xi (mod (+ x xd) chip8/SCREEN-WIDTH)
+              yi (mod (+ y yd) chip8/SCREEN-HEIGHT)
+              canvas-pixel (chip8--get-pixel xi yi canvas-pixels canvas-width)
               sprite-index (- pixels-in-sprite 1 (+ xd (* yd 8)))
               sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
         (when (and canvas-pixel sprite-pixel)
           (setq collision? t))
         (retro--plot-pixel
-         (+ x xd)
-         (+ y yd)
+         xi
+         yi
          (logxor canvas-pixel sprite-pixel)
          canvas-pixels
          canvas-width)))
