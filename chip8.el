@@ -363,7 +363,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x15)
           ;; Fx15 - LD DT, Vx
           ;; Set delay timer = Vx.
-          (setf (chip8-delay-timer emulator) (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8)))
+          (setf (chip8-delay-timer emulator) (chip8--vx emulator nimbles))
+          (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x18)
           ;; Fx18 - LD ST, Vx
           ;; Set sound timer = Vx.
