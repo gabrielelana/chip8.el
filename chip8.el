@@ -274,8 +274,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #x6000)
       ;; 6xkk - LD Vx, byte
       ;; Set Vx = kk.
-      (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-            (logand nimbles #x00FF))
+      (setf (chip8--vx emulator nimbles) (logand nimbles #x00FF))
       (cl-incf (chip8-pc emulator) 2))
      ((eq opcode #xD000)
       ;; Dxyn - DRW Vx, Vy, nibble
@@ -300,29 +299,26 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #x3000)
       ;; 3xkk - SE Vx, byte
       ;; Skip next instruction if Vx = kk.
-      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-              (logand nimbles #x00FF))
+      (if (eq (chip8--vx emulator nimbles) (logand nimbles #x00FF))
           (cl-incf (chip8-pc emulator) 4)
         (cl-incf (chip8-pc emulator) 2)))
      ((eq opcode #x4000)
       ;; 4xkk - SNE Vx, byte
       ;; Skip next instruction if Vx != kk.
-      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
+      (if (eq (chip8--vx emulator nimbles)
               (logand nimbles #x00FF))
           (cl-incf (chip8-pc emulator) 2)
         (cl-incf (chip8-pc emulator) 4)))
      ((eq opcode #x5000)
       ;; 5xy0 - SE Vx, Vy
       ;; Skip next instruction if Vx = Vy.
-      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-              (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+      (if (eq (chip8--vx emulator nimbles) (chip8--vy emulator nimbles))
           (cl-incf (chip8-pc emulator) 4)
         (cl-incf (chip8-pc emulator) 2)))
      ((eq opcode #x9000)
       ;; 9xy0 - SNE Vx, Vy
       ;; Skip next instruction if Vx != Vy.
-      (if (eq (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-              (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+      (if (eq (chip8--vx emulator nimbles) (chip8--vy emulator nimbles))
           (cl-incf (chip8-pc emulator) 2)
         (cl-incf (chip8-pc emulator) 4)))
      ((eq opcode #x2000)
@@ -385,9 +381,10 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x1E)
           ;; Fx1E - ADD I, Vx
           ;; Set I = I + Vx.
-          (setf (chip8-i emulator) (logand (+ (chip8-i emulator)
-                                              (chip8--vx emulator nimbles))
-                                           #xFFFF))
+          (let ((i (+ (chip8-i emulator)
+                      (chip8--vx emulator nimbles))))
+            (setf (chip8-i emulator) (logand i #x0FFF)
+                  (aref (chip8-v emulator) #xF) (if (eq i (logand i #x0FFF)) #x0 #x1)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x65)
           ;; Fx65 - LD Vx, [I]
@@ -415,29 +412,25 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-nimble #x0)
           ;; 8xy0 - LD Vx, Vy
           ;; Set Vx = Vy.
-          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4)))
+          (setf (chip8--vx emulator nimbles) (chip8--vy emulator nimbles))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x1)
           ;; 8xy1 - OR Vx, Vy
           ;; Set Vx = Vx OR Vy.
-          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                (logior (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (setf (chip8--vx emulator nimbles) (logior (chip8--vx emulator nimbles)
+                                                     (chip8--vy emulator nimbles)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x2)
           ;; 8xy2 - AND Vx, Vy
           ;; Set Vx = Vx AND Vy.
-          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                (logand (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (setf (chip8--vx emulator nimbles) (logand (chip8--vx emulator nimbles)
+                                                     (chip8--vy emulator nimbles)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x3)
           ;; 8xy3 - XOR Vx, Vy
           ;; Set Vx = Vx XOR Vy.
-          (setf (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                (logxor (aref (chip8-v emulator) (ash (logand nimbles #x0F00) -8))
-                        (aref (chip8-v emulator) (ash (logand nimbles #x00F0) -4))))
+          (setf (chip8--vx emulator nimbles) (logxor (chip8--vx emulator nimbles)
+                                                     (chip8--vy emulator nimbles)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x4)
           ;; 8xy4 - ADD Vx, Vy
