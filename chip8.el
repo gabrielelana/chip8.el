@@ -242,12 +242,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
   "Run a single step of fetch/decode of the EMULATOR."
   (let* ((nimbles (chip8--fetch16 emulator))
          (opcode (logand nimbles #xF000)))
-    ;; (message "fetch 0x%04X at 0x%04X" nimbles (chip8-pc emulator))
-    ;; (message "fetch 0x%04X at 0x%04X (stack: %S) (keys: %S)"
-    ;;          nimbles
+    ;; (message "[0x%04X: 0x%04X] i: 0x%04X \n\tregisters: %S\n\tstack: %S"
     ;;          (chip8-pc emulator)
-    ;;          (seq-map (lambda (x) (format "0x%04X" x)) (chip8-stack emulator))
-    ;;          (seq-map (lambda (k) (if (> k 0) "#" ".")) (chip8-keys emulator)))
+    ;;          nimbles
+    ;;          (chip8-i emulator)
+    ;;          (seq-map-indexed (lambda (x i) (format "0x%X: 0x%02X" i x)) (chip8-v emulator))
+    ;;          (seq-map (lambda (x) (format "0x%04X" x)) (chip8-stack emulator)))
     (cond
      ((eq nimbles #x00E0)
       ;; 00E0 - CLS
