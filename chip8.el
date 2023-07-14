@@ -400,7 +400,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x55)
           ;; Fx55 - LD [I], Vx
           ;; Store registers V0 through Vx in memory starting at location I.
-          (let ((vx (mod (chip8--vx emulator nimbles) #xF))
+          ;; F165 means to store registers V0 to I and V1 to (I + 1)
+          ;; F265 means to store registers V0 to I, V1 to (I + 1) and V2 to (I + 2)
+          (let ((vx (ash (logand nimbles #x0F00) -8))
                 (ri (chip8-i emulator)))
             (cl-loop for i from 0 to vx
                      do (chip8--write-bytes emulator (aref (chip8-v emulator) i) 1 (+ ri i))))
