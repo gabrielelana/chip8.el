@@ -233,9 +233,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
       (retro--buffer-render current-canvas previous-canvas)
       (chip8--canvas-copy current-canvas previous-canvas)
-      (setf (chip8-last-frame-at chip8--current-instance) (current-time))
-      (cl-decf (chip8-delay-timer chip8--current-instance))
-      (cl-decf (chip8-sound-timer chip8--current-instance))
+      (setf (chip8-last-frame-at chip8--current-instance) (current-time)
+            (chip8-delay-timer chip8--current-instance) (max 0 (1- (chip8-delay-timer chip8--current-instance)))
+            (chip8-sound-timer chip8--current-instance) (max 0 (1- (chip8-sound-timer chip8--current-instance))))
       (run-at-time 0.001 nil 'chip8--run))))
 
 (defun chip8--step (emulator)
