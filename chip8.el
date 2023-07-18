@@ -40,6 +40,8 @@
 (defconst chip8/SCREEN-WIDTH 64)
 (defconst chip8/SCREEN-HEIGHT 32)
 
+(defconst chip8/KEY-RELEASE-TIMEOUT 0.3)
+
 (defconst chip8/RAM-SIZE 4096)
 
 ;;; TODO: should be variables? Some games have different bicolors
@@ -84,7 +86,6 @@
 ;;; TODO: documentation
 (defvar chip8--current-key nil)
 (defvar chip8--current-key-timer nil)
-(defvar chip8--key-release-timeout 0.3)
 
 (defvar chip8-mode-map
   (let ((map (make-sparse-keymap)))
@@ -119,6 +120,7 @@
   (keys (make-vector 16 0) :documentation "Keypad 16 current keys status representation")
   (current-canvas nil :documentation "Current retro.el canvas, display representation")
   (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el")
+  (waiting-for-key-release nil :documentation "Keycode of the key we are waiting to be relased. See Fx0A")
   (last-frame-at (current-time) :documentation "Timestamp when the last frame got rendered"))
 
 (define-derived-mode chip8-mode nil "CHIP-8 Emulator"
@@ -142,12 +144,22 @@
     (cancel-timer chip8--current-key-timer))
   (aset (chip8-keys chip8--current-instance) keycode #x1)
   (setq chip8--current-key keycode
-        chip8--current-key-timer (run-at-time chip8--key-release-timeout nil #'chip8--key-release)))
+        chip8--current-key-timer (run-at-time chip8/KEY-RELEASE-TIMEOUT nil #'chip8--key-release)))
 
 (defun chip8--key-release ()
   "Will emulate the key release of current pressed keycode in current EMULATOR."
   (when chip8--current-key
     (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)))
+
+(defun chip8--key-pressed-p (keycode emulator)
+  "Return t if key with KEYCODE is pressed in EMULATOR."
+  (if (eq (aref (chip8-keys emulator) keycode) #x1)
+      t
+    nil))
+
+(defun chip8--key-pressed (emulator)
+  "Return keycode of first pressed key in EMULATOR, nil otherwise."
+  (seq-find (lambda (k) (> k #x0)) (chip8-keys emulator) nil))
 
 (defmacro chip8--vx (emulator nimbles)
   "Given instruction NIMBLES get the Vx register of EMULATOR.
@@ -339,14 +351,15 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x0A)
           ;; Fx0A - LD Vx, K
           ;; Wait for a key press, store the value of the key in Vx.
-          (let ((keys (chip8-keys emulator)))
-            (catch 'found
-              (dotimes (i #xF)
-                (when (> (aref keys i) 0)
-                  ;; One key is pressed, Vx = K, go to next instruction
-                  (setf (chip8--vx emulator nimbles) i)
-                  (cl-incf (chip8-pc emulator) 2)
-                  (throw 'found nil))))))
+          (let ((key-pressed (chip8-waiting-for-key-release emulator)))
+            (if key-pressed
+                (when (not (chip8--key-pressed-p key-pressed emulator))
+                  (setf (chip8--vx emulator nimbles) key-pressed
+                        (chip8-waiting-for-key-release emulator) nil)
+                  (cl-incf (chip8-pc emulator) 2))
+              (setq key-pressed (chip8--key-pressed emulator))
+              (when key-pressed
+                (setf (chip8-waiting-for-key-release emulator) key-pressed)))))
          ((eq last-byte #x07)
           ;; Fx07 - LD Vx, DT
           ;; Set Vx = delay timer value.
@@ -487,13 +500,13 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x9E)
           ;; Ex9E - SKP Vx
           ;; Skip next instruction if key with the value of Vx is pressed.
-          (if (> (aref (chip8-keys emulator) (chip8--vx emulator nimbles)) 0)
+          (if (chip8--key-pressed-p (chip8--vx emulator nimbles) emulator)
               (cl-incf (chip8-pc emulator) 4)
             (cl-incf (chip8-pc emulator) 2)))
          ((eq last-byte #xA1)
           ;; ExA1 - SKNP Vx
           ;; Skip next instruction if key with the value of Vx is not pressed.
-          (if (eq (aref (chip8-keys emulator) (chip8--vx emulator nimbles)) 0)
+          (if (not (chip8--key-pressed-p (chip8--vx emulator nimbles) emulator))
               (cl-incf (chip8-pc emulator) 4)
             (cl-incf (chip8-pc emulator) 2)))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
