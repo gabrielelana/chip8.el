@@ -434,19 +434,25 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; 8xy1 - OR Vx, Vy
           ;; Set Vx = Vx OR Vy.
           (setf (chip8--vx emulator nimbles) (logior (chip8--vx emulator nimbles)
-                                                     (chip8--vy emulator nimbles)))
+                                                     (chip8--vy emulator nimbles))
+                ;; Quirk https://chip8.gulrak.net/#quirk4
+                (aref (chip8-v emulator) #xF) #x0)
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x2)
           ;; 8xy2 - AND Vx, Vy
           ;; Set Vx = Vx AND Vy.
           (setf (chip8--vx emulator nimbles) (logand (chip8--vx emulator nimbles)
-                                                     (chip8--vy emulator nimbles)))
+                                                     (chip8--vy emulator nimbles))
+                ;; Quirk https://chip8.gulrak.net/#quirk4
+                (aref (chip8-v emulator) #xF) #x0)
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x3)
           ;; 8xy3 - XOR Vx, Vy
           ;; Set Vx = Vx XOR Vy.
           (setf (chip8--vx emulator nimbles) (logxor (chip8--vx emulator nimbles)
-                                                     (chip8--vy emulator nimbles)))
+                                                     (chip8--vy emulator nimbles))
+                ;; Quirk https://chip8.gulrak.net/#quirk4
+                (aref (chip8-v emulator) #xF) #x0)
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x4)
           ;; 8xy4 - ADD Vx, Vy
