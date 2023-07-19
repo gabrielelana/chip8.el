@@ -43,6 +43,8 @@
 (defconst chip8/KEY-RELEASE-TIMEOUT 0.3)
 
 (defconst chip8/RAM-SIZE 4096)
+(defconst chip8/FRAME-DURATION 0.03
+  "Duration of a single frame in emuation.")
 
 ;;; TODO: make the theme configurable
 (defconst chip8/COLORS
@@ -234,10 +236,10 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       (setq last-frame-at (chip8-last-frame-at chip8--current-instance)
             current-canvas (chip8-current-canvas chip8--current-instance)
             previous-canvas (chip8-previous-canvas chip8--current-instance))
-      (while (< elapsed 0.030)
+      (while (< elapsed chip8/FRAME-DURATION)
         (chip8--step chip8--current-instance)
         (setq elapsed (float-time (time-subtract (current-time) last-frame-at)))
-        (sleep-for 0.001))
+        (sleep-for 0.002))
       ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
       (retro--buffer-render current-canvas previous-canvas)
       (chip8--canvas-copy current-canvas previous-canvas)
