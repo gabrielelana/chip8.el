@@ -40,7 +40,7 @@
 (defconst chip8/SCREEN-WIDTH 64)
 (defconst chip8/SCREEN-HEIGHT 32)
 
-(defconst chip8/KEY-RELEASE-TIMEOUT 0.2
+(defconst chip8/KEY-RELEASE-TIMEOUT 0.15
   "Time between the keypress event and the simulation of the keyrelease event.")
 
 (defconst chip8/RAM-SIZE 4096
@@ -48,6 +48,9 @@
 
 (defconst chip8/FRAME-DURATION 0.03
   "Duration of a single frame in emuation.")
+
+(defconst chip8/INSTRUCTIONS-PER-FRAME 9
+  "Number of instructions to execute per frame.")
 
 ;;; TODO: make the theme configurable
 (defconst chip8/COLORS
@@ -232,6 +235,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          (current-canvas nil)
          (previous-canvas nil)
          (last-frame-at 0)
+         (instructions-counter 0)
          (elapsed 0))
     ;; it runs only when we are in the emulator buffer
     (when (eq (current-buffer) buffer)
@@ -241,9 +245,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
             current-canvas (chip8-current-canvas chip8--current-instance)
             previous-canvas (chip8-previous-canvas chip8--current-instance))
       (while (< elapsed chip8/FRAME-DURATION)
-        (chip8--step chip8--current-instance)
-        (setq elapsed (float-time (time-subtract (current-time) last-frame-at)))
-        (sleep-for 0.002))
+        (if (>= instructions-counter chip8/INSTRUCTIONS-PER-FRAME)
+            (sleep-for 0.01)
+          (chip8--step chip8--current-instance)
+          (setq instructions-counter (1+ instructions-counter))
+          (sleep-for 0.001))
+        (setq elapsed (float-time (time-subtract (current-time) last-frame-at))))
       ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
       (retro--buffer-render current-canvas previous-canvas)
       (chip8--canvas-copy current-canvas previous-canvas)
