@@ -44,7 +44,7 @@
 
 (defconst chip8/RAM-SIZE 4096)
 
-;;; TODO: should be variables? Some games have different bicolors
+;;; TODO: make the theme configurable
 (defconst chip8/COLORS
   ;; [(#x00 #x00 #x00) (#xFF #xFF #xFF)]
   [(#x99 #x66 #x01) (#xFF #xCC #x01)]
@@ -77,11 +77,11 @@
                        ]
   "Default font loaded as sprites in CHIP-8 RAM.")
 
-;;; TODO: documentation
-(defvar chip8--current-rom-filename nil)
+(defvar chip8--current-rom-filename nil
+  "File path of ROM loaded in the running Chip-8 emulator.")
 
-;;; TODO: documentation
-(defvar chip8--current-instance nil)
+(defvar chip8--current-instance nil
+  "Current instance of running Chip-8 emulator.")
 
 (defvar chip8-mode-map
   (let ((map (make-sparse-keymap)))
