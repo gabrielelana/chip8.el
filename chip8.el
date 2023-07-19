@@ -83,10 +83,6 @@
 ;;; TODO: documentation
 (defvar chip8--current-instance nil)
 
-;;; TODO: documentation
-(defvar chip8--current-key nil)
-(defvar chip8--current-key-timer nil)
-
 (defvar chip8-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "q") #'chip8-quit)
@@ -117,7 +113,7 @@
   (stack '() :documentation "Stack")
   (delay-timer 0 :documentation "Delay timer")
   (sound-timer 0 :documentation "Sound timer")
-  (keys (make-vector 16 0) :documentation "Keypad 16 current keys status representation")
+  (keys (make-vector 16 nil) :documentation "Keypad 16 current keys status representation")
   (current-canvas nil :documentation "Current retro.el canvas, display representation")
   (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el")
   (waiting-for-key-release nil :documentation "Keycode of the key we are waiting to be relased. See Fx0A")
@@ -139,27 +135,27 @@
 
 (defun chip8--key-press (keycode)
   "Will emulate the key press of KEYCODE in current EMULATOR."
-  (when (not (null chip8--current-key))
-    (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)
-    (cancel-timer chip8--current-key-timer))
-  (aset (chip8-keys chip8--current-instance) keycode #x1)
-  (setq chip8--current-key keycode
-        chip8--current-key-timer (run-at-time chip8/KEY-RELEASE-TIMEOUT nil #'chip8--key-release)))
+  (aset (chip8-keys chip8--current-instance) keycode (current-time))
+  (run-at-time chip8/KEY-RELEASE-TIMEOUT nil #'chip8--key-release keycode))
 
-(defun chip8--key-release ()
-  "Will emulate the key release of current pressed keycode in current EMULATOR."
-  (when chip8--current-key
-    (aset (chip8-keys chip8--current-instance) chip8--current-key #x0)))
+(defun chip8--key-release (keycode)
+  "Will emulate the key release of KEYCODE in current EMULATOR."
+  (let ((key-pressed-at (aref (chip8-keys chip8--current-instance) keycode)))
+    (when (>= (float-time (time-subtract (current-time) key-pressed-at)) chip8/KEY-RELEASE-TIMEOUT)
+      (aset (chip8-keys chip8--current-instance) keycode nil))))
 
 (defun chip8--key-pressed-p (keycode emulator)
   "Return t if key with KEYCODE is pressed in EMULATOR."
-  (if (eq (aref (chip8-keys emulator) keycode) #x1)
+  (if (aref (chip8-keys emulator) keycode)
       t
     nil))
 
 (defun chip8--key-pressed (emulator)
   "Return keycode of first pressed key in EMULATOR, nil otherwise."
-  (seq-find (lambda (k) (> k #x0)) (chip8-keys emulator) nil))
+  (cl-loop for element across (chip8-keys emulator)
+           for index from 0
+           until (not (eq element nil))
+           finally (return (if element index nil))))
 
 (defmacro chip8--vx (emulator nimbles)
   "Given instruction NIMBLES get the Vx register of EMULATOR.
