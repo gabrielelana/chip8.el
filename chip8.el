@@ -409,7 +409,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           (let ((vx (ash (logand nimbles #x0F00) -8))
                 (ri (chip8-i emulator)))
             (cl-loop for i from 0 to vx
-                     do (setf (aref (chip8-v emulator) i) (chip8--read-bytes emulator 1 (+ ri i)))))
+                     do (setf (aref (chip8-v emulator) i) (chip8--read-bytes emulator 1 (+ ri i))))
+            ;; Quirk https://chip8.gulrak.net/#quirk11
+            (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x55)
           ;; Fx55 - LD [I], Vx
@@ -419,7 +421,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           (let ((vx (ash (logand nimbles #x0F00) -8))
                 (ri (chip8-i emulator)))
             (cl-loop for i from 0 to vx
-                     do (chip8--write-bytes emulator (aref (chip8-v emulator) i) 1 (+ ri i))))
+                     do (chip8--write-bytes emulator (aref (chip8-v emulator) i) 1 (+ ri i)))
+            ;; Quirk https://chip8.gulrak.net/#quirk11
+            (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      ((eq opcode #x8000)
