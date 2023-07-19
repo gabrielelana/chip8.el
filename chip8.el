@@ -534,28 +534,28 @@ corresponding pixel, otherwise we need to turn it \"off\".
 Returns a boolean value indicating if there was a collision (aka
 if any pixel on the CANVAS was turned off)."
   (let ((collision? nil)
-        (pixels-in-sprite (* n 8))
         (canvas-pixels (retro-canvas-pixels (chip8-current-canvas emulator)))
         (canvas-width (retro-canvas-width (chip8-current-canvas emulator)))
-        sprite-index
+        (sprite-index (* n 8))
         canvas-pixel
         sprite-pixel
         xi yi)
     (dotimes (yd n)
       (dotimes (xd 8)
-        (setq xi (mod (+ x xd) chip8/SCREEN-WIDTH)
-              yi (mod (+ y yd) chip8/SCREEN-HEIGHT)
-              canvas-pixel (chip8--get-pixel xi yi canvas-pixels canvas-width)
-              sprite-index (- pixels-in-sprite 1 (+ xd (* yd 8)))
-              sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
-        (when (and canvas-pixel sprite-pixel)
-          (setq collision? t))
-        (retro--plot-pixel
-         xi
-         yi
-         (logxor canvas-pixel sprite-pixel)
-         canvas-pixels
-         canvas-width)))
+        (setq xi (+ x xd)
+              yi (+ y yd)
+              sprite-index (1- sprite-index))
+        (when (and (< xi chip8/SCREEN-WIDTH) (< yi chip8/SCREEN-HEIGHT))
+          (setq canvas-pixel (chip8--get-pixel xi yi canvas-pixels canvas-width)
+                sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
+          (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
+            (setq collision? t))
+          (retro--plot-pixel
+           xi
+           yi
+           (logxor canvas-pixel sprite-pixel)
+           canvas-pixels
+           canvas-width))))
     collision?))
 
 (defun chip8--fetch16 (emulator)
