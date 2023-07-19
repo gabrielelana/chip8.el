@@ -489,20 +489,22 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set Vx = Vx SHR 1.
           ;; If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
           ;; Then Vx is divided by 2.
-          ;; TODO: in some platforms Vx = Vy as first operation
-          (let ((vx (chip8--vx emulator nimbles)))
-            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vx -1))
-                  (aref (chip8-v emulator) #xF) (if (> (logand vx #x01) 0) #x1 #x0)))
+          (let ((_vx (chip8--vx emulator nimbles))
+                (vy (chip8--vy emulator nimbles)))
+            ;; Quirk https://chip8.gulrak.net/#quirk5
+            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vy -1))
+                  (aref (chip8-v emulator) #xF) (if (> (logand vy #x01) 0) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #xE)
           ;; 8xyE - SHL Vx {, Vy}
           ;; Set Vx = Vx SHL 1.
           ;; If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
           ;; Then Vx is multiplied by 2.
-          ;; TODO: in some platforms Vx = Vy as first operation
-          (let ((vx (chip8--vx emulator nimbles)))
-            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vx 1))
-                  (aref (chip8-v emulator) #xF) (if (> (logand vx #x80) 0) #x1 #x0)))
+          (let ((_vx (chip8--vx emulator nimbles))
+                (vy (chip8--vy emulator nimbles)))
+            ;; Quirk https://chip8.gulrak.net/#quirk5
+            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vy 1))
+                  (aref (chip8-v emulator) #xF) (if (> (logand vy #x80) 0) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      ((eq opcode #xE000)
