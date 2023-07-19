@@ -527,7 +527,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
   "Draw SPRITE made of N bytes on EMULATOR's canvas at coordinates (X, Y).
 
 A sprite is 8 pixel wide and N pixel tall (where N is the number
-fo bytes), every byte is a line of the sprite, every bit of the
+of bytes), every byte is a line of the sprite, every bit of the
 byte is a pixel, if the bit is 1 then we need to turn \"on\" the
 corresponding pixel, otherwise we need to turn it \"off\".
 
