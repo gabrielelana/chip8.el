@@ -282,8 +282,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #xB000)
       ;; Bnnn - JP V0, addr
       ;; Jump to location nnn + V0.
-      (setf (chip8-i emulator) (+ (logand nimbles #x0FFF) (aref (chip8-v emulator) #x0)))
-      (cl-incf (chip8-pc emulator) 2))
+      ;; TODO: Quirk https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#bnnn-jump-with-offset
+      (setf (chip8-pc emulator) (+ (logand nimbles #x0FFF) (aref (chip8-v emulator) #x0))))
      ((eq opcode #x6000)
       ;; 6xkk - LD Vx, byte
       ;; Set Vx = kk.
