@@ -40,9 +40,12 @@
 (defconst chip8/SCREEN-WIDTH 64)
 (defconst chip8/SCREEN-HEIGHT 32)
 
-(defconst chip8/KEY-RELEASE-TIMEOUT 0.3)
+(defconst chip8/KEY-RELEASE-TIMEOUT 0.2
+  "Time between the keypress event and the simulation of the keyrelease event.")
 
-(defconst chip8/RAM-SIZE 4096)
+(defconst chip8/RAM-SIZE 4096
+  "Dimension of the RAM.")
+
 (defconst chip8/FRAME-DURATION 0.03
   "Duration of a single frame in emuation.")
 
@@ -52,7 +55,8 @@
   [(#x99 #x66 #x01) (#xFF #xCC #x01)]
   "List of colors supported by the emulator, they are indexed starting from zero.")
 
-(defconst chip8/BUFFER-NAME "*CHIP8-EMULATOR*")
+(defconst chip8/BUFFER-NAME "*CHIP8-EMULATOR*"
+  "The name of the buffer used to show the emulator.")
 
 (defconst chip8/FONT-ADDRESS #x50
   "Address where to find/load default font in RAM.")
