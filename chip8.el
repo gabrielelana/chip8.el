@@ -607,12 +607,6 @@ complement of X if X is a negative number."
               (+ #x100 x)
             x)))
 
-;; (chip8--to-bdc 192)
-;; (chip8--to-bdc 1946)
-;; (chip8--to-bdc 0)
-;; (chip8--to-bdc 01)
-;; (chip8--to-bdc 012)
-
 ;;; TODO: move to retro
 ;;; TODO: retro--get-pixel
 ;;; TODO: retro--get-pixel-canvas
@@ -689,41 +683,6 @@ if SWITCH-TO-BUFFER-P is \\='t'."
         (when switch-to-buffer-p
           (switch-to-buffer buffer-name))
         canvas))))
-
-;; (let ((sprite (logior (ash #x80 32)
-;;                       (ash #xFF 24)
-;;                       (ash #xFF 16)
-;;                       (ash #xFF 8)
-;;                       #x01)))
-;;   (list
-;;    (format "0x%04X" sprite)
-;;    (ash (logand sprite (ash #x01 39)) -39)
-;;    (ash (logand sprite (ash #x01 38)) -38)
-;;    (ash (logand sprite (ash #x01 37)) -37)
-;;    (ash (logand sprite (ash #x01 1)) -1)
-;;    (ash (logand sprite (ash #x01 0)) 0)
-;;    ))
-
-;; (let ((rom (with-temp-buffer
-;;              (set-buffer-multibyte nil)
-;;              (setq buffer-file-coding-system 'binary)
-;;              (insert-file-contents-literally "./roms/ibm-logo.ch8" nil 0)
-;;              (buffer-substring-no-properties (point-min) (point-max)))))
-;;   (seq-into rom 'vector))
-
-;; (defun chip8--setup-colors (colors)
-;;   "Setup COLORS as retro.el requires.
-
-;; COLORS is a vector of list of RGBs like
-;; \\='[(#x00 #x00 #x00) (#xFF #xFF #xFF)]'."
-;;   )
-
-;;; TODO: make a test with this
-;; (let ((emulator (make-chip8 :ram (make-vector 6 0))))
-;;   (chip8--write-bytes emulator #x04030201 4 0)
-;;   (message "%S" (chip8-ram emulator)))
-
-;; (message "Store registers 0x%04X through 0x%04X in memory starting at location 0x%04X (registers: %S)" 0 vx ri (seq-map (lambda (x) (format "0x%04X" x)) (chip8-v emulator)))
 
 (provide 'chip8)
 
