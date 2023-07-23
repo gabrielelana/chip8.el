@@ -87,10 +87,13 @@
   "Default font loaded as sprites in CHIP-8 RAM.")
 
 (defvar chip8--current-rom-filename nil
-  "File path of ROM loaded in the running Chip-8 emulator.")
+  "File path of ROM loaded in the running CHIP-8 emulator.")
+
+(defvar chip8--current-quirks nil
+  "Current set of quirks used by CHIP-8 emulator..")
 
 (defvar chip8--current-instance nil
-  "Current instance of running Chip-8 emulator.")
+  "Current instance of running CHIP-8 emulator.")
 
 (defvar chip8-mode-map
   (let ((map (make-sparse-keymap)))
@@ -114,7 +117,115 @@
     map)
   "Keymap for `chip8-mode'.")
 
+;;; TODO BC_test.ch8 (shift t, leave-i-unchanged t)
+
+(cl-defstruct chip8-quirks
+  "Quirks configuration for a CHIP-8 emulator.
+
+Quirks are little differences in opcodes interpretation by
+different CHIP-8 interpreters developed through the years.
+
+The following list of quirks is taken from
+https://github.com/chip-8/chip-8-database/blob/master/database/quirks.json"
+  (shift nil :documentation "On most systems the shift opcodes take `vY` as input and stores
+the shifted version of `vY` into `vX`. The interpreters for the
+HP48 took `vX` as both the input and the output, introducing the
+shift quirk. If t opcodes `8XY6` and `8XYE` take `vX` as both
+input and output. If nil opcodes `8XY6` and `8XYE` take `vY` as
+input and `vX` as output.")
+  (increment-i-by-x nil :documentation "On most systems storing and retrieving data between registers and
+memory increments the `i` register with `X + 1` (the number of
+registers read or written). So for each register read or writen,
+the index register would be incremented. The CHIP-48 interpreter
+for the HP48 would only increment the `i` register by `X`,
+introducing the first load/store quirk. If t opcodes `FX55` and
+`FX65` increment the `i` register with `X`. If nil opcodes `FX55`
+and `FX65` increment the `i` register with `X + 1`.")
+  (leave-i-unchanged t :documentation "On most systems storing and retrieving data between registers and
+memory increments the `i` register relative to the number of
+registers read or written. The Superchip 1.1 interpreter for the
+HP48 however did not increment the `i` register at all,
+introducing the second load/store quirk. If t opcodes `FX55` and
+`FX65` leave the `i` register unchanged. If nil opcodes `FX55`
+and `FX65` increment the `i` register.")
+  (wrap nil :documentation "Most systems, when drawing sprites to the screen, will clip
+sprites at the edges of the screen. The Octo interpreter, which
+spawned the XO-CHIP variant of CHIP-8, instead wraps the sprite
+around to the other side of the screen. This introduced the wrap
+quirk. If t the `DXYN` opcode wraps around to the other side of
+the screen when drawing at the edges. If nil the `DXYN` opcode
+clips when drawing at the edges of the screen.")
+  (jump nil :documentation "The jump to `<address> + v0` opcode was wronly implemented on all
+the HP48 interpreters as jump to `<address> + vX`, introducing
+the jump quirk. If t opcode `BXNN` jumps to address `XNN + vX`.
+If nil opcode `BNNN` jumps to address `NNN + v0`.")
+  (vblank nil :documentation "The original Cosmac VIP interpreter would wait for vertical blank
+before each sprite draw. This was done to prevent sprite tearing
+on the display, but it would also act as an accidental limit on
+the execution speed of the program. Some programs rely on this
+speed limit to be playable. Vertical blank happens at 60Hz, and
+as such its logic be combined with the timers. If t opcode `DXYN`
+waits for vertical blank (so max 60 sprites drawn per second). If
+nil opcode `DXYN` draws immediately (number of sprites drawn per
+second only limited to number of CPU cycles per frame).")
+  (logic t :documentation "On the original Cosmac VIP interpreter, `vF` would be reset after
+each opcode that would invoke the maths coprocessor. Later
+interpreters have not copied this behaviour. If t opcodes `8XY1`,
+`8XY2` and `8XY3` (OR, AND and XOR) will set `vF` to zero after
+execution (even if `vF` is the parameter `X`). If nil opcodes
+`8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will leave `vF`
+unchanged (unless `vF` is the parameter `X`)."))
+
+(defconst chip8--original-quirks
+  (make-chip8-quirks
+   :shift nil
+   :increment-i-by-x nil
+   :leave-i-unchanged nil
+   :wrap nil
+   :jump nil
+   :vblank t
+   :logic t)
+  "Quirks of original Cosmac VIP CHIP-8 implementation.
+See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
+
+(defconst chip8--modern-quirks
+  (make-chip8-quirks
+   :shift nil
+   :increment-i-by-x nil
+   :leave-i-unchanged nil
+   :wrap nil
+   :jump nil
+   :vblank nil
+   :logic nil)
+  "Quirks of Modern CHIP-8 implementation.
+See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
+
+(defconst chip8--superchip-quirks
+  (make-chip8-quirks
+   :shift t
+   :increment-i-by-x nil
+   :leave-i-unchanged t
+   :wrap nil
+   :jump t
+   :vblank nil
+   :logic nil)
+  "Quirks of Superchip CHIP-8 implementation.
+See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
+
+(defconst chip8--xo-chip-quirks
+  (make-chip8-quirks
+   :shift nil
+   :increment-i-by-x nil
+   :leave-i-unchanged nil
+   :wrap t
+   :jump nil
+   :vblank nil
+   :logic nil)
+  "Quirks of XO-CHIP CHIP-8 implementation.
+See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
+
 (cl-defstruct chip8
+  "CHIP-8 emulator state."
   (ram (make-vector chip8/RAM-SIZE 0) :documentation "4K of ram")
   (v (make-vector 16 0) :documentation "General purpose registers, 8 bits")
   (i 0 :documentation "Index register, 16 bits")
@@ -126,21 +237,50 @@
   (current-canvas nil :documentation "Current retro.el canvas, display representation")
   (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el")
   (waiting-for-key-release nil :documentation "Keycode of the key we are waiting to be relased. See Fx0A")
-  (last-frame-at (current-time) :documentation "Timestamp when the last frame got rendered"))
+  (last-frame-at (current-time) :documentation "Timestamp when the last frame got rendered")
+  (quirks (make-chip8-quirks) :documentation "Quirks configuration to use in the emulator"))
 
 (define-derived-mode chip8-mode nil "CHIP-8 Emulator"
   (use-local-map chip8-mode-map)
-  (setq chip8--current-instance (chip8--setup chip8--current-rom-filename t))
+  (setq chip8--current-instance (chip8--setup
+                                 chip8--current-rom-filename
+                                 chip8--current-quirks
+                                 t))
   (run-at-time 0.001 nil 'chip8--run))
 
 (defun chip8 (filename)
-  "Run chip8 emulation of FILENAME rom."
+  "Run chip8 emulation loading FILENAME rom."
   (interactive "ffilename: ")
   (select-window (or (get-buffer-window chip8/BUFFER-NAME)
                      (selected-window)))
   (switch-to-buffer chip8/BUFFER-NAME)
-  (setq chip8--current-rom-filename filename)
+  (setq chip8--current-rom-filename filename
+        chip8--current-quirks (or chip8--current-quirks chip8--original-quirks))
   (chip8-mode))
+
+(defun chip8-original (filename)
+  "Run chip8 emulation loading FILENAME rom with original Cosmac VIP CHIP-8 quirks."
+  (interactive "ffilename: ")
+  (setq chip8--current-quirks chip8--original-quirks)
+  (chip8 filename))
+
+(defun chip8-modern (filename)
+  "Run chip8 emulation loading FILENAME rom with modern CHIP-8 quirks."
+  (interactive "ffilename: ")
+  (setq chip8--current-quirks chip8--modern-quirks)
+  (chip8 filename))
+
+(defun chip8-superchip (filename)
+  "Run chip8 emulation loading FILENAME rom with superchip CHIP-8 quirks."
+  (interactive "ffilename: ")
+  (setq chip8--current-quirks chip8--superchip-quirks)
+  (chip8 filename))
+
+(defun chip8-xo-chip (filename)
+  "Run chip8 emulation loading FILENAME rom with superchip CHIP-8 quirks."
+  (interactive "ffilename: ")
+  (setq chip8--current-quirks chip8--xo-chip-quirks)
+  (chip8 filename))
 
 (defun chip8--key-press (keycode)
   "Will emulate the key press of KEYCODE in current EMULATOR."
@@ -184,14 +324,19 @@ name of the register from the third nimble and then we return
 the PLACE of this register in EMULATOR."
   `(aref (chip8-v ,emulator) (ash (logand ,nimbles #x00F0) -4)))
 
+(defmacro chip8--vf (emulator)
+  "Return the Vf register of EMULATOR."
+  `(aref (chip8-v ,emulator) #xF))
+
 (defun chip8-quit ()
   "Quit current game if any."
   (interactive)
-  (setq chip8--current-instance nil)
+  (setq chip8--current-instance nil
+        chip8--current-quirks nil)
   (kill-buffer chip8/BUFFER-NAME))
 
-(defun chip8--setup (filename switch-to-buffer-p)
-  "Setup game with rom FILENAME.
+(defun chip8--setup (filename quirks switch-to-buffer-p)
+  "Setup game with rom FILENAME and QUIRKS.
 
 Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
   (retro--init-color-palette chip8/COLORS 0)
@@ -207,6 +352,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
     (make-chip8
      :pc chip8/ROM-ADDRESS
      :ram ram
+     :quirks quirks
      :current-canvas canvas
      :previous-canvas (retro-canvas-copy canvas))))
 
@@ -295,8 +441,10 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #xB000)
       ;; Bnnn - JP V0, addr
       ;; Jump to location nnn + V0.
-      ;; TODO: Quirk https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#bnnn-jump-with-offset
-      (setf (chip8-pc emulator) (+ (logand nimbles #x0FFF) (aref (chip8-v emulator) #x0))))
+      ;; Quirk https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#bnnn-jump-with-offset
+      (if (chip8-quirks-jump (chip8-quirks emulator))
+          (setf (chip8-pc emulator) (+ (logand nimbles #x0FFF) (chip8--vx emulator nimbles)))
+        (setf (chip8-pc emulator) (+ (logand nimbles #x0FFF) (aref (chip8-v emulator) #x0)))))
      ((eq opcode #x6000)
       ;; 6xkk - LD Vx, byte
       ;; Set Vx = kk.
@@ -424,7 +572,10 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
             (cl-loop for i from 0 to vx
                      do (setf (aref (chip8-v emulator) i) (chip8--read-bytes emulator 1 (+ ri i))))
             ;; Quirk https://chip8.gulrak.net/#quirk11
-            (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))
+            (unless (chip8-quirks-leave-i-unchanged (chip8-quirks emulator))
+              (if (chip8-quirks-increment-i-by-x (chip8-quirks emulator))
+                  (setf (chip8-i emulator) (+ (chip8-i emulator) vx))
+                (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x55)
           ;; Fx55 - LD [I], Vx
@@ -436,7 +587,10 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
             (cl-loop for i from 0 to vx
                      do (chip8--write-bytes emulator (aref (chip8-v emulator) i) 1 (+ ri i)))
             ;; Quirk https://chip8.gulrak.net/#quirk11
-            (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))
+            (unless (chip8-quirks-leave-i-unchanged (chip8-quirks emulator))
+              (if (chip8-quirks-increment-i-by-x (chip8-quirks emulator))
+                  (setf (chip8-i emulator) (+ (chip8-i emulator) vx))
+                (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))))
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      ((eq opcode #x8000)
@@ -451,25 +605,28 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; 8xy1 - OR Vx, Vy
           ;; Set Vx = Vx OR Vy.
           (setf (chip8--vx emulator nimbles) (logior (chip8--vx emulator nimbles)
-                                                     (chip8--vy emulator nimbles))
-                ;; Quirk https://chip8.gulrak.net/#quirk4
-                (aref (chip8-v emulator) #xF) #x0)
+                                                     (chip8--vy emulator nimbles)))
+          ;; Quirk https://chip8.gulrak.net/#quirk4
+          (when (chip8-quirks-logic (chip8-quirks emulator))
+            (setf (chip8--vf emulator) #x0))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x2)
           ;; 8xy2 - AND Vx, Vy
           ;; Set Vx = Vx AND Vy.
           (setf (chip8--vx emulator nimbles) (logand (chip8--vx emulator nimbles)
-                                                     (chip8--vy emulator nimbles))
-                ;; Quirk https://chip8.gulrak.net/#quirk4
-                (aref (chip8-v emulator) #xF) #x0)
+                                                     (chip8--vy emulator nimbles)))
+          ;; Quirk https://chip8.gulrak.net/#quirk4
+          (when (chip8-quirks-logic (chip8-quirks emulator))
+            (setf (chip8--vf emulator) #x0))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x3)
           ;; 8xy3 - XOR Vx, Vy
           ;; Set Vx = Vx XOR Vy.
           (setf (chip8--vx emulator nimbles) (logxor (chip8--vx emulator nimbles)
-                                                     (chip8--vy emulator nimbles))
-                ;; Quirk https://chip8.gulrak.net/#quirk4
-                (aref (chip8-v emulator) #xF) #x0)
+                                                     (chip8--vy emulator nimbles)))
+          ;; Quirk https://chip8.gulrak.net/#quirk4
+          (when (chip8-quirks-logic (chip8-quirks emulator))
+            (setf (chip8--vf emulator) #x0))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x4)
           ;; 8xy4 - ADD Vx, Vy
@@ -502,22 +659,28 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set Vx = Vx SHR 1.
           ;; If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0.
           ;; Then Vx is divided by 2.
-          (let ((_vx (chip8--vx emulator nimbles))
+          (let ((vx (chip8--vx emulator nimbles))
                 (vy (chip8--vy emulator nimbles)))
             ;; Quirk https://chip8.gulrak.net/#quirk5
-            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vy -1))
-                  (aref (chip8-v emulator) #xF) (if (> (logand vy #x01) 0) #x1 #x0)))
+            (if (chip8-quirks-shift (chip8-quirks emulator))
+                (setf (chip8--vx emulator nimbles) (logand #xFF (ash vx -1))
+                      (chip8--vf emulator) (if (> (logand vx #x01) 0) #x1 #x0))
+              (setf (chip8--vx emulator nimbles) (logand #xFF (ash vy -1))
+                    (chip8--vf emulator) (if (> (logand vy #x01) 0) #x1 #x0))))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #xE)
           ;; 8xyE - SHL Vx {, Vy}
           ;; Set Vx = Vx SHL 1.
           ;; If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0.
           ;; Then Vx is multiplied by 2.
-          (let ((_vx (chip8--vx emulator nimbles))
+          (let ((vx (chip8--vx emulator nimbles))
                 (vy (chip8--vy emulator nimbles)))
             ;; Quirk https://chip8.gulrak.net/#quirk5
-            (setf (chip8--vx emulator nimbles) (logand #xFF (ash vy 1))
-                  (aref (chip8-v emulator) #xF) (if (> (logand vy #x80) 0) #x1 #x0)))
+            (if (chip8-quirks-shift (chip8-quirks emulator))
+                (setf (chip8--vx emulator nimbles) (logand #xFF (ash vx 1))
+                      (chip8--vf emulator) (if (> (logand vx #x80) 0) #x1 #x0))
+              (setf (chip8--vx emulator nimbles) (logand #xFF (ash vy 1))
+                    (chip8--vf emulator) (if (> (logand vy #x80) 0) #x1 #x0))))
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      ((eq opcode #xE000)
@@ -560,6 +723,9 @@ if any pixel on the CANVAS was turned off)."
         (setq xi (+ x xd)
               yi (+ y yd)
               sprite-index (1- sprite-index))
+        (when (chip8-quirks-wrap (chip8-quirks emulator))
+          (setq xi (mod xi chip8/SCREEN-WIDTH)
+                yi (mod yi chip8/SCREEN-HEIGHT)))
         (when (and (< xi chip8/SCREEN-WIDTH) (< yi chip8/SCREEN-HEIGHT))
           (setq canvas-pixel (chip8--get-pixel xi yi canvas-pixels canvas-width)
                 sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
