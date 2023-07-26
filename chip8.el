@@ -117,8 +117,6 @@
     map)
   "Keymap for `chip8-mode'.")
 
-;;; TODO BC_test.ch8 (shift t, leave-i-unchanged t)
-
 (cl-defstruct chip8-quirks
   "Quirks configuration for a CHIP-8 emulator.
 
@@ -240,6 +238,28 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
   (last-frame-at (current-time) :documentation "Timestamp when the last frame got rendered")
   (quirks (make-chip8-quirks) :documentation "Quirks configuration to use in the emulator"))
 
+(defvar chip8-configure-on-sha1-alist
+  '(("9df1689015a0d1d95144f141903296f9f1c35fc5" .
+     ((:filename . "BC_test.ch8")
+      (:description . "Test the conditional jumps, the mathematical and logical operations of Chip 8")
+      (:url . "https://github.com/cj1128/chip8-emulator/blob/74bca24c32c2954955d2e520a71041001baf9e78/rom/BC_test.ch8")
+      (:platform . "superchip"))))
+  "Alist mapping a CHIP-8 ROM's SHA1 with the appropriate emulator configuration.
+
+If you have a ROM that needs a specific configuration you can add
+your ROM configuration to this list.
+
+The elements of the list have the form (SHA1 . CONFIGURATION)
+where SHA1 is the sha1 of the ROM's file and CONFIGURATION is an
+alist with the following recognized keys
+
+- :filename The original filename of the ROM (only for documentation purpose)
+- :description Description of what the ROM does (only for documentation purpose)
+- :url Canonical URL where to find the ROM file (only for documentation purpose)
+- :platform Selects a platform configuration. Select a set of quirks and set of
+  configurable parameters to match the behaviour of the platform. Supported
+  platforms are: \"original\", \"modern\", \"superchip\", \"xo-chip\".")
+
 (define-derived-mode chip8-mode nil "CHIP-8 Emulator"
   (use-local-map chip8-mode-map)
   (setq chip8--current-instance (chip8--setup
@@ -249,13 +269,25 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
   (run-at-time 0.001 nil 'chip8--run))
 
 (defun chip8 (filename)
-  "Run chip8 emulation loading FILENAME rom."
+  "Run chip8 emulation with FILENAME ROM.
+
+If called from function `chip8-PLATFORM' will run the ROM with
+the configuration associated with PLATFORM.
+
+If filename SHA1 is found in `chip8-configure-on-sha1-alist'
+alist then will run the ROM with the associated configuration.
+
+Otherwise will run the ROM as the original platform."
   (interactive "ffilename: ")
+  (when (or (not (file-exists-p filename)) (not (file-readable-p filename)) (file-directory-p filename))
+    (user-error "ROM file %s does not exists or is not readable" filename))
   (select-window (or (get-buffer-window chip8/BUFFER-NAME)
                      (selected-window)))
   (switch-to-buffer chip8/BUFFER-NAME)
   (setq chip8--current-rom-filename filename
-        chip8--current-quirks (or chip8--current-quirks chip8--original-quirks))
+        chip8--current-quirks (or chip8--current-quirks
+                                  (chip8--quirks-from-sha (chip8--sha1-rom filename))
+                                  chip8--original-quirks))
   (chip8-mode))
 
 (defun chip8-original (filename)
@@ -363,8 +395,6 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
 
 (defun chip8--load-rom (filename ram)
   "Load rom FILENAME in CHIP-8 RAM."
-  (when (or (not (file-exists-p filename)) (not (file-readable-p filename)) (file-directory-p filename))
-    (user-error "ROM file %s does not exists or is not readable" filename))
   (let ((rom (seq-into
               (with-temp-buffer
                 (set-buffer-multibyte nil)
@@ -785,6 +815,31 @@ complement of X if X is a negative number."
           (if (< x 0)
               (+ #x100 x)
             x)))
+
+(defun chip8--quirks-from-sha (rom-sha)
+  "Return emulator quirks of a ROM which sha1 is ROM-SHA.
+
+Return quirks if ROM is found in in associated list
+`chip8-configure-on-sha1-alist', otherwise return nil."
+  (let* ((configuration (alist-get rom-sha chip8-configure-on-sha1-alist nil nil 'equal))
+         (platform (when configuration (alist-get :platform configuration)))
+         (quirks-s (when platform (intern (format "chip8--%s-quirks" platform)))))
+    (when (and platform (not (boundp quirks-s)))
+      (user-error "Found SHA %s in `chip8-configure-on-sha1-alist' but specified platform %s is not supported"
+                  rom-sha platform))
+    (if platform
+        (symbol-value quirks-s)
+      nil)))
+
+(defun chip8--sha1-rom (filepath)
+  "Return SHA1 of FILEPATH if exists."
+  (when (or (not (file-exists-p filepath)) (not (file-readable-p filepath)))
+    (user-error "File %s do not exists or is not reable" filepath))
+  (with-temp-buffer
+    (set-buffer-multibyte nil)
+    (setq buffer-file-coding-system 'binary)
+    (insert-file-contents-literally filepath nil 0)
+    (sha1 (current-buffer))))
 
 ;;; TODO: move to retro
 ;;; TODO: retro--get-pixel
