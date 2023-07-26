@@ -374,7 +374,7 @@ the PLACE of this register in EMULATOR."
 Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
   (retro--init-color-palette chip8/COLORS 0)
   (let ((ram (make-vector chip8/RAM-SIZE 0))
-        (canvas (chip8--init-buffer
+        (canvas (retro-init-buffer
                  chip8/BUFFER-NAME
                  chip8/SCREEN-WIDTH
                  chip8/SCREEN-HEIGHT
@@ -430,7 +430,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
         (setq elapsed (float-time (time-subtract (current-time) last-frame-at))))
       ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
       (retro--buffer-render current-canvas previous-canvas)
-      (chip8--canvas-copy current-canvas previous-canvas)
+      (retro-canvas-pixels-copy current-canvas previous-canvas)
       (setf (chip8-last-frame-at chip8--current-instance) (current-time)
             (chip8-delay-timer chip8--current-instance) (max 0 (1- (chip8-delay-timer chip8--current-instance)))
             (chip8-sound-timer chip8--current-instance) (max 0 (1- (chip8-sound-timer chip8--current-instance))))
@@ -758,7 +758,7 @@ if any pixel on the CANVAS was turned off)."
           (setq xi (mod xi chip8/SCREEN-WIDTH)
                 yi (mod yi chip8/SCREEN-HEIGHT)))
         (when (and (< xi chip8/SCREEN-WIDTH) (< yi chip8/SCREEN-HEIGHT))
-          (setq canvas-pixel (chip8--get-pixel xi yi canvas-pixels canvas-width)
+          (setq canvas-pixel (retro-canvas-pixels-pixel xi yi canvas-pixels canvas-width)
                 sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
           (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
             (setq collision? t))
@@ -841,93 +841,6 @@ Return quirks if ROM is found in in associated list
     (setq buffer-file-coding-system 'binary)
     (insert-file-contents-literally filepath nil 0)
     (sha1 (current-buffer))))
-
-;;; TODO: move to retro
-;;; TODO: retro--get-pixel
-;;; TODO: retro--get-pixel-canvas
-(defun chip8--get-pixel (x y pixels width)
-  "Get pixel color at (X, Y) in PIXELS with a certain WIDTH."
-  (aref pixels (+ (* y width) x)))
-
-;;; TODO: move to retro
-;;; TODO: retro--canvas-pixels-copy
-(defun chip8--canvas-copy (from to)
-  "Copy pixels in canvas FROM to pixels in canvas TO."
-  (setf (retro-canvas-pixels to) (copy-sequence (retro-canvas-pixels from))))
-
-;;; TODO: move to retro
-(defun chip8--init-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
-  "Setup buffer BUFFER-NAME as retro.el requires.
-
-Will return a retro.el canvas ready to be used as screen with
-retro.el primitives.
-
-Canvas will be initialized with a screen width SCREEN-WIDTH,
-SCREEN-HEIGHT and a background color with index BACKGROUND-COLOR.
-
-When setup is completed will switch to BUFFER-NAME
-if SWITCH-TO-BUFFER-P is \\='t'."
-  (select-window (or (get-buffer-window buffer-name)
-                     (selected-window)))
-  (with-current-buffer (get-buffer-create buffer-name)
-    ;; Disable mode-line before calibration
-    (let* ((window (selected-window))
-           ;; NOTE: without switching to buffer, buffer calibration is not
-           ;; reliable, I didn't find a way to make it work but since we don't
-           ;; need precision because we are not looking at the buffer, a dummy
-           ;; but credible calibration will do
-           (calibration (if switch-to-buffer-p
-                            (retro--calibrate-canvas-in-window
-                             screen-width
-                             screen-height
-                             window)
-                          (list 10 screen-width screen-height)))
-           (pixel-size (nth 0 calibration))
-           (window-width (nth 1 calibration))
-           (window-height (nth 2 calibration)))
-      (when (not calibration) (error "Failed to calibrate pixel size in buffer %s" buffer-name))
-      ;; Buffer settings to not display text but display graphics
-      (erase-buffer)
-      (buffer-disable-undo)
-      (jit-lock-mode nil)
-      (font-lock-mode -1)
-      (mouse-wheel-mode -1)
-      (auto-save-mode -1)
-      (setq-local visible-cursor nil
-                  hl-line-mode nil
-                  mode-line-format nil
-                  cursor-type nil
-                  inhibit-modification-hooks t
-                  inhibit-compacting-font-caches t
-                  bidi-inhibit-bpa t
-                  bidi-display-reordering nil
-                  bidi-paragraph-direction 'left-to-right)
-      ;; Buffer initialization with background pixels
-      (goto-char (point-min))
-      (set-face-attribute 'retro-default-face nil :height pixel-size)
-      (buffer-face-set 'retro-default-face)
-      (let* ((margin-top (/ (- window-height screen-height) 2))
-             (margin-left (/ (- window-width screen-width) 2))
-             (canvas (retro-canvas-create :margin-left margin-left
-                                          :margin-top margin-top
-                                          :width screen-width
-                                          :height screen-height
-                                          :background-color background-color))
-             (margin-top-string (propertize (make-string (+ margin-left screen-width) 32) 'face 'default))
-             (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
-             (canvas-string (propertize (make-string screen-width 32) 'face (aref retro-palette-faces background-color))))
-        (setq-local buffer-read-only nil)
-        (dotimes (_ margin-top)
-          (insert margin-top-string)
-          (insert "\n"))
-        (dotimes (_ screen-height)
-          (insert margin-left-string)
-          (insert canvas-string)
-          (insert "\n"))
-        (setq-local buffer-read-only t)
-        (when switch-to-buffer-p
-          (switch-to-buffer buffer-name))
-        canvas))))
 
 (provide 'chip8)
 
