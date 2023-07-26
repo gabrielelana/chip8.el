@@ -374,7 +374,7 @@ the PLACE of this register in EMULATOR."
 Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
   (retro--init-color-palette chip8/COLORS 0)
   (let ((ram (make-vector chip8/RAM-SIZE 0))
-        (canvas (chip8--setup-buffer
+        (canvas (chip8--init-buffer
                  chip8/BUFFER-NAME
                  chip8/SCREEN-WIDTH
                  chip8/SCREEN-HEIGHT
@@ -856,8 +856,7 @@ Return quirks if ROM is found in in associated list
   (setf (retro-canvas-pixels to) (copy-sequence (retro-canvas-pixels from))))
 
 ;;; TODO: move to retro
-;;; TODO: retro-init-buffer or something
-(defun chip8--setup-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
+(defun chip8--init-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
   "Setup buffer BUFFER-NAME as retro.el requires.
 
 Will return a retro.el canvas ready to be used as screen with
@@ -871,6 +870,7 @@ if SWITCH-TO-BUFFER-P is \\='t'."
   (select-window (or (get-buffer-window buffer-name)
                      (selected-window)))
   (with-current-buffer (get-buffer-create buffer-name)
+    ;; Disable mode-line before calibration
     (let* ((window (selected-window))
            ;; NOTE: without switching to buffer, buffer calibration is not
            ;; reliable, I didn't find a way to make it work but since we don't
@@ -886,6 +886,24 @@ if SWITCH-TO-BUFFER-P is \\='t'."
            (window-width (nth 1 calibration))
            (window-height (nth 2 calibration)))
       (when (not calibration) (error "Failed to calibrate pixel size in buffer %s" buffer-name))
+      ;; Buffer settings to not display text but display graphics
+      (erase-buffer)
+      (buffer-disable-undo)
+      (jit-lock-mode nil)
+      (font-lock-mode -1)
+      (mouse-wheel-mode -1)
+      (auto-save-mode -1)
+      (setq-local visible-cursor nil
+                  hl-line-mode nil
+                  mode-line-format nil
+                  cursor-type nil
+                  inhibit-modification-hooks t
+                  inhibit-compacting-font-caches t
+                  bidi-inhibit-bpa t
+                  bidi-display-reordering nil
+                  bidi-paragraph-direction 'left-to-right)
+      ;; Buffer initialization with background pixels
+      (goto-char (point-min))
       (set-face-attribute 'retro-default-face nil :height pixel-size)
       (buffer-face-set 'retro-default-face)
       (let* ((margin-top (/ (- window-height screen-height) 2))
@@ -898,6 +916,7 @@ if SWITCH-TO-BUFFER-P is \\='t'."
              (margin-top-string (propertize (make-string (+ margin-left screen-width) 32) 'face 'default))
              (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
              (canvas-string (propertize (make-string screen-width 32) 'face (aref retro-palette-faces background-color))))
+        (setq-local buffer-read-only nil)
         (dotimes (_ margin-top)
           (insert margin-top-string)
           (insert "\n"))
@@ -905,16 +924,7 @@ if SWITCH-TO-BUFFER-P is \\='t'."
           (insert margin-left-string)
           (insert canvas-string)
           (insert "\n"))
-        (setq-local buffer-read-only t
-                    visible-cursor nil
-                    cursor-type nil
-                    inhibit-modification-hooks t
-                    inhibit-compacting-font-caches t
-                    bidi-inhibit-bpa t
-                    bidi-display-reordering nil
-                    bidi-paragraph-direction 'left-to-right
-                    buffer-read-only nil
-                    mode-line-format nil)
+        (setq-local buffer-read-only t)
         (when switch-to-buffer-p
           (switch-to-buffer buffer-name))
         canvas))))
