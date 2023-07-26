@@ -114,6 +114,7 @@
     (define-key map (kbd "d") #'(lambda () (interactive) (chip8--key-press #xD)))
     (define-key map (kbd "e") #'(lambda () (interactive) (chip8--key-press #xE)))
     (define-key map (kbd "f") #'(lambda () (interactive) (chip8--key-press #xF)))
+    (define-key map [t] 'ignore)
     map)
   "Keymap for `chip8-mode'.")
 
