@@ -49,7 +49,7 @@
 (defconst chip8/FRAME-DURATION 0.03
   "Duration of a single frame in emuation.")
 
-(defconst chip8/INSTRUCTIONS-PER-FRAME 9
+(defconst chip8/INSTRUCTIONS-PER-FRAME 18
   "Number of instructions to execute per frame.")
 
 ;;; TODO: make the theme configurable
