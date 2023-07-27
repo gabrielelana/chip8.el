@@ -405,7 +405,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
 (defun chip8--load-default-font (ram)
   "Load default font in CHIP-8 RAM."
   (dotimes (i (length chip8/FONT))
-    (aset ram (+ i chip8/FONT-ADDRESS) (aref chip8/FONT i))))
+    (aset ram (+ i chip8/FONT-ADDRESS) (aref chip8/FONT i)))
+  (dotimes (i (length chip8/HI-RES-FONT))
+    (aset ram (+ i chip8/FONT-ADDRESS (length chip8/FONT) 1) (aref chip8/HI-RES-FONT i))))
 
 (defun chip8--load-rom (filename ram)
   "Load rom FILENAME in CHIP-8 RAM."
