@@ -257,6 +257,10 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
      ((:filename . "BC_test.ch8")
       (:description . "Test the conditional jumps, the mathematical and logical operations of Chip 8")
       (:url . "https://github.com/cj1128/chip8-emulator/blob/74bca24c32c2954955d2e520a71041001baf9e78/rom/BC_test.ch8")
+      (:platform . "superchip")))
+    ("5c28a5f85289c9d859f95fd5eadbdcb1c30bb08b" .
+     ((:filename . "invaders.ch8")
+      (:description . "Space Invaders (1978), by David Winter. The well known game. Destroy the invaders with your ship. Shoot with 5, move with 4 and 6. Press 5 to begin a game.")
       (:platform . "superchip"))))
   "Alist mapping a CHIP-8 ROM's SHA1 with the appropriate emulator configuration.
 
