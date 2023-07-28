@@ -424,7 +424,6 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      :quirks quirks
      :current-canvas canvas
      :previous-canvas (retro-canvas-copy canvas)
-     ;; TODO: give as parameter
      :display-scale 2
      :display-width (/ chip8/SCREEN-WIDTH 2)
      :display-height (/ chip8/SCREEN-HEIGHT 2))))
@@ -938,57 +937,6 @@ the screen if COUNT-CLIPPED is t."
                                                     (make-vector n #x0))
                                             rows)
                           finally (return (seq-reverse rows)))))))
-
-;; (apply '+ '(1 2 3))
-
-;; (cl-loop for i from 0 below 10
-;;          for rows = (cons i rows)
-;;          finally (return (seq-reverse rows)))
-
-;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
-;;   (retro--plot-pixel 0 0 #x1 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 1 0 #x2 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 2 0 #x3 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 3 0 #x4 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 4 0 #x5 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 5 0 #x6 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 6 0 #x7 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 7 0 #x8 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 8 0 #x9 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 9 0 #xA (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (chip8--scroll-left 4 canvas)
-;;   (retro-canvas-pixels canvas))
-
-
-;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
-;;   (retro--plot-pixel 0 0 #x1 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 1 0 #x2 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 2 0 #x3 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 3 0 #x4 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 4 0 #x5 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 5 0 #x6 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 6 0 #x7 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 7 0 #x8 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 8 0 #x9 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (retro--plot-pixel 9 0 #xA (retro-canvas-pixels canvas) (retro-canvas-width canvas))
-;;   (chip8--scroll-left 4 canvas)
-;;   (retro-canvas-pixels canvas))
-
-;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
-;;   (chip8--scroll-right 1 canvas)
-;;   (retro-canvas-pixels canvas))
-
-;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
-;;   (chip8--scroll-right 1 canvas)
-;;   (retro-canvas-pixels canvas))
-
-
-;; (let ((v (make-vector 10 0)))
-;;   (setf (seq-subseq v 0 2) (make-vector 2 1)))
-
-;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
-;;   (chip8--scroll-up 1 canvas)
-;;   (retro-canvas-pixels canvas))
 
 (defun chip8--fetch16 (emulator)
   "Fetch 16 bits from EMULATOR's RAM at PC."
