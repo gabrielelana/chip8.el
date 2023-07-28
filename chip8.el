@@ -36,9 +36,9 @@
   "This is an example."
   2)
 
-;;; TODO: will be variables in chip8 data structure when support for SUPER-CHIP
-(defconst chip8/SCREEN-WIDTH 64)
-(defconst chip8/SCREEN-HEIGHT 32)
+;;; TODO: documentation
+(defconst chip8/SCREEN-WIDTH 128)
+(defconst chip8/SCREEN-HEIGHT 64)
 
 (defconst chip8/KEY-RELEASE-TIMEOUT 0.15
   "Time between the keypress event and the simulation of the keyrelease event.")
@@ -46,10 +46,10 @@
 (defconst chip8/RAM-SIZE 4096
   "Dimension of the RAM.")
 
-(defconst chip8/FRAME-DURATION 0.03
+(defconst chip8/FRAME-DURATION 0.02
   "Duration of a single frame in emuation.")
 
-(defconst chip8/INSTRUCTIONS-PER-FRAME 18
+(defconst chip8/INSTRUCTIONS-PER-FRAME 30
   "Number of instructions to execute per frame.")
 
 ;;; TODO: make the theme configurable
@@ -63,6 +63,9 @@
 
 (defconst chip8/FONT-ADDRESS #x50
   "Address where to find/load default font in RAM.")
+
+(defconst chip8/HIRES-FONT-ADDRESS #xA1
+  "Address where to find/load default hires font in RAM.")
 
 (defconst chip8/ROM-ADDRESS #x200
   "Address where to find/load ROM to execute in RAM.")
@@ -86,17 +89,17 @@
                        ]
   "Default font loaded as sprites in CHIP-8 RAM.")
 
-(defconst chip8/HI-RES-FONT [ 0x3C, 0x7E, 0xE7, 0xC3, 0xC3, 0xC3, 0xC3, 0xE7, 0x7E, 0x3C, ; 0
-                              0x18, 0x38, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, ; 1
-                              0x3E, 0x7F, 0xC3, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0xFF, ; 2
-                              0x3C, 0x7E, 0xC3, 0x03, 0x0E, 0x0E, 0x03, 0xC3, 0x7E, 0x3C, ; 3
-                              0x06, 0x0E, 0x1E, 0x36, 0x66, 0xC6, 0xFF, 0xFF, 0x06, 0x06, ; 4
-                              0xFF, 0xFF, 0xC0, 0xC0, 0xFC, 0xFE, 0x03, 0xC3, 0x7E, 0x3C, ; 5
-                              0x3E, 0x7C, 0xC0, 0xC0, 0xFC, 0xFE, 0xC3, 0xC3, 0x7E, 0x3C, ; 6
-                              0xFF, 0xFF, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x60, ; 7
-                              0x3C, 0x7E, 0xC3, 0xC3, 0x7E, 0x7E, 0xC3, 0xC3, 0x7E, 0x3C, ; 8
-                              0x3C, 0x7E, 0xC3, 0xC3, 0x7F, 0x3F, 0x03, 0x03, 0x3E, 0x7C  ; 9
-                              ]
+(defconst chip8/HIRES-FONT [ 0x3C, 0x7E, 0xE7, 0xC3, 0xC3, 0xC3, 0xC3, 0xE7, 0x7E, 0x3C, ; 0
+                             0x18, 0x38, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, ; 1
+                             0x3E, 0x7F, 0xC3, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0xFF, ; 2
+                             0x3C, 0x7E, 0xC3, 0x03, 0x0E, 0x0E, 0x03, 0xC3, 0x7E, 0x3C, ; 3
+                             0x06, 0x0E, 0x1E, 0x36, 0x66, 0xC6, 0xFF, 0xFF, 0x06, 0x06, ; 4
+                             0xFF, 0xFF, 0xC0, 0xC0, 0xFC, 0xFE, 0x03, 0xC3, 0x7E, 0x3C, ; 5
+                             0x3E, 0x7C, 0xC0, 0xC0, 0xFC, 0xFE, 0xC3, 0xC3, 0x7E, 0x3C, ; 6
+                             0xFF, 0xFF, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x60, 0x60, ; 7
+                             0x3C, 0x7E, 0xC3, 0xC3, 0x7E, 0x7E, 0xC3, 0xC3, 0x7E, 0x3C, ; 8
+                             0x3C, 0x7E, 0xC3, 0xC3, 0x7F, 0x3F, 0x03, 0x03, 0x3E, 0x7C  ; 9
+                             ]
   "Default font loaded as sprites in CHIP-8 RAM for SUPER-CHIP hi resolution mode.")
 
 (defvar chip8--current-rom-filename nil
@@ -139,54 +142,63 @@ different CHIP-8 interpreters developed through the years.
 
 The following list of quirks is taken from
 https://github.com/chip-8/chip-8-database/blob/master/database/quirks.json"
-  (shift nil :documentation "On most systems the shift opcodes take `vY` as input and stores
-the shifted version of `vY` into `vX`. The interpreters for the
-HP48 took `vX` as both the input and the output, introducing the
-shift quirk. If t opcodes `8XY6` and `8XYE` take `vX` as both
-input and output. If nil opcodes `8XY6` and `8XYE` take `vY` as
-input and `vX` as output.")
-  (increment-i-by-x nil :documentation "On most systems storing and retrieving data between registers and
-memory increments the `i` register with `X + 1` (the number of
-registers read or written). So for each register read or writen,
-the index register would be incremented. The CHIP-48 interpreter
-for the HP48 would only increment the `i` register by `X`,
-introducing the first load/store quirk. If t opcodes `FX55` and
-`FX65` increment the `i` register with `X`. If nil opcodes `FX55`
-and `FX65` increment the `i` register with `X + 1`.")
-  (leave-i-unchanged t :documentation "On most systems storing and retrieving data between registers and
-memory increments the `i` register relative to the number of
-registers read or written. The Superchip 1.1 interpreter for the
-HP48 however did not increment the `i` register at all,
-introducing the second load/store quirk. If t opcodes `FX55` and
-`FX65` leave the `i` register unchanged. If nil opcodes `FX55`
-and `FX65` increment the `i` register.")
-  (wrap nil :documentation "Most systems, when drawing sprites to the screen, will clip
-sprites at the edges of the screen. The Octo interpreter, which
-spawned the XO-CHIP variant of CHIP-8, instead wraps the sprite
-around to the other side of the screen. This introduced the wrap
-quirk. If t the `DXYN` opcode wraps around to the other side of
-the screen when drawing at the edges. If nil the `DXYN` opcode
-clips when drawing at the edges of the screen.")
-  (jump nil :documentation "The jump to `<address> + v0` opcode was wronly implemented on all
-the HP48 interpreters as jump to `<address> + vX`, introducing
-the jump quirk. If t opcode `BXNN` jumps to address `XNN + vX`.
-If nil opcode `BNNN` jumps to address `NNN + v0`.")
-  (vblank nil :documentation "The original Cosmac VIP interpreter would wait for vertical blank
-before each sprite draw. This was done to prevent sprite tearing
-on the display, but it would also act as an accidental limit on
-the execution speed of the program. Some programs rely on this
-speed limit to be playable. Vertical blank happens at 60Hz, and
-as such its logic be combined with the timers. If t opcode `DXYN`
-waits for vertical blank (so max 60 sprites drawn per second). If
-nil opcode `DXYN` draws immediately (number of sprites drawn per
-second only limited to number of CPU cycles per frame).")
-  (logic t :documentation "On the original Cosmac VIP interpreter, `vF` would be reset after
-each opcode that would invoke the maths coprocessor. Later
-interpreters have not copied this behaviour. If t opcodes `8XY1`,
-`8XY2` and `8XY3` (OR, AND and XOR) will set `vF` to zero after
-execution (even if `vF` is the parameter `X`). If nil opcodes
-`8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will leave `vF`
-unchanged (unless `vF` is the parameter `X`)."))
+  (shift nil :documentation "On most systems the shift opcodes take
+`vY` as input and stores the shifted version of `vY` into `vX`.
+The interpreters for the HP48 took `vX` as both the input and the
+output, introducing the shift quirk. If t opcodes `8XY6` and
+`8XYE` take `vX` as both input and output. If nil opcodes `8XY6`
+and `8XYE` take `vY` as input and `vX` as output.")
+  (increment-i-by-x nil :documentation "On most systems storing
+ and retrieving data between registers and memory increments the
+`i` register with `X + 1` (the number of registers read or
+written). So for each register read or writen, the index register
+would be incremented. The CHIP-48 interpreter for the HP48 would
+only increment the `i` register by `X`, introducing the first
+load/store quirk. If t opcodes `FX55` and `FX65` increment the
+`i` register with `X`. If nil opcodes `FX55` and `FX65` increment
+the `i` register with `X + 1`.")
+  (leave-i-unchanged t :documentation "On most systems storing and
+ retrieving data between registers and memory increments the `i`
+register relative to the number of registers read or written. The
+Superchip 1.1 interpreter for the HP48 however did not increment
+the `i` register at all, introducing the second load/store quirk.
+If t opcodes `FX55` and `FX65` leave the `i` register unchanged.
+If nil opcodes `FX55` and `FX65` increment the `i` register.")
+  (wrap nil :documentation "Most systems, when drawing sprites to
+ the screen, will clip sprites at the edges of the screen. The
+Octo interpreter, which spawned the XO-CHIP variant of CHIP-8,
+instead wraps the sprite around to the other side of the screen.
+This introduced the wrap quirk. If t the `DXYN` opcode wraps
+around to the other side of the screen when drawing at the edges.
+If nil the `DXYN` opcode clips when drawing at the edges of the
+screen.")
+  (jump nil :documentation "The jump to `<address> + v0` opcode was
+ wronly implemented on all the HP48 interpreters as jump to
+`<address> + vX`, introducing the jump quirk. If t opcode `BXNN`
+jumps to address `XNN + vX`. If nil opcode `BNNN` jumps to
+address `NNN + v0`.")
+  (vblank nil :documentation "The original Cosmac VIP interpreter
+ would wait for vertical blank before each sprite draw. This was
+done to prevent sprite tearing on the display, but it would also
+act as an accidental limit on the execution speed of the program.
+Some programs rely on this speed limit to be playable. Vertical
+blank happens at 60Hz, and as such its logic be combined with the
+timers. If t opcode `DXYN` waits for vertical blank (so max 60
+sprites drawn per second). If nil opcode `DXYN` draws
+immediately (number of sprites drawn per second only limited to
+number of CPU cycles per frame).")
+  (logic t :documentation "On the original Cosmac VIP interpreter,
+`vF` would be reset after each opcode that would invoke the maths
+coprocessor. Later interpreters have not copied this behaviour.
+If t opcodes `8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will set
+`vF` to zero after execution (even if `vF` is the parameter `X`).
+If nil opcodes `8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will
+leave `vF` unchanged (unless `vF` is the parameter `X`).")
+  (count-collisions t :documentation "On the original Cosmac VIP
+interpreter, would set the `vF` register to 0x1 when a collision
+was detected after `DXYN` instruction. The Superchip 1.1
+interpreter will punt in `vF` the number of sprite rows collision
+plus the number of the rows clipped at the bottom border."))
 
 (defconst chip8--original-quirks
   (make-chip8-quirks
@@ -196,7 +208,8 @@ unchanged (unless `vF` is the parameter `X`)."))
    :wrap nil
    :jump nil
    :vblank t
-   :logic t)
+   :logic t
+   :count-collisions nil)
   "Quirks of original Cosmac VIP CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
 
@@ -208,7 +221,8 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
    :wrap nil
    :jump nil
    :vblank nil
-   :logic nil)
+   :logic nil
+   :count-collisions nil)
   "Quirks of Modern CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
 
@@ -220,7 +234,8 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
    :wrap nil
    :jump t
    :vblank nil
-   :logic nil)
+   :logic nil
+   :count-collisions t)
   "Quirks of Superchip CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
 
@@ -232,7 +247,8 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
    :wrap t
    :jump nil
    :vblank nil
-   :logic nil)
+   :logic nil
+   :count-collisions t)
   "Quirks of XO-CHIP CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
 
@@ -250,7 +266,10 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
   (previous-canvas nil :documentation "Previous retro.el canvas, needed by retro.el")
   (waiting-for-key-release nil :documentation "Keycode of the key we are waiting to be relased. See Fx0A")
   (last-frame-at (current-time) :documentation "Timestamp when the last frame got rendered")
-  (quirks (make-chip8-quirks) :documentation "Quirks configuration to use in the emulator"))
+  (quirks (make-chip8-quirks) :documentation "Quirks configuration to use in the emulator")
+  (display-scale nil :documentation "Pixels scale factor. Low resolution (lores): 2. Hi resolution (hires): 1")
+  (display-width nil :documentation "Pixels width of the display")
+  (display-height nil :documentation "Pixels height of the display"))
 
 (defvar chip8-configure-on-sha1-alist
   '(("9df1689015a0d1d95144f141903296f9f1c35fc5" .
@@ -404,14 +423,18 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      :ram ram
      :quirks quirks
      :current-canvas canvas
-     :previous-canvas (retro-canvas-copy canvas))))
+     :previous-canvas (retro-canvas-copy canvas)
+     ;; TODO: give as parameter
+     :display-scale 2
+     :display-width (/ chip8/SCREEN-WIDTH 2)
+     :display-height (/ chip8/SCREEN-HEIGHT 2))))
 
 (defun chip8--load-default-font (ram)
   "Load default font in CHIP-8 RAM."
   (dotimes (i (length chip8/FONT))
     (aset ram (+ i chip8/FONT-ADDRESS) (aref chip8/FONT i)))
-  (dotimes (i (length chip8/HI-RES-FONT))
-    (aset ram (+ i chip8/FONT-ADDRESS (length chip8/FONT) 1) (aref chip8/HI-RES-FONT i))))
+  (dotimes (i (length chip8/HIRES-FONT))
+    (aset ram (+ i chip8/HIRES-FONT-ADDRESS) (aref chip8/HIRES-FONT i))))
 
 (defun chip8--load-rom (filename ram)
   "Load rom FILENAME in CHIP-8 RAM."
@@ -442,10 +465,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
             previous-canvas (chip8-previous-canvas chip8--current-instance))
       (while (< elapsed chip8/FRAME-DURATION)
         (if (>= instructions-counter chip8/INSTRUCTIONS-PER-FRAME)
-            (sleep-for 0.01)
+            (sleep-for 0.001)
           (chip8--step chip8--current-instance)
-          (setq instructions-counter (1+ instructions-counter))
-          (sleep-for 0.001))
+          (setq instructions-counter (1+ instructions-counter)))
         (setq elapsed (float-time (time-subtract (current-time) last-frame-at))))
       ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
       (retro--buffer-render current-canvas previous-canvas)
@@ -453,12 +475,13 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       (setf (chip8-last-frame-at chip8--current-instance) (current-time)
             (chip8-delay-timer chip8--current-instance) (max 0 (1- (chip8-delay-timer chip8--current-instance)))
             (chip8-sound-timer chip8--current-instance) (max 0 (1- (chip8-sound-timer chip8--current-instance))))
-      (run-at-time 0.001 nil 'chip8--run))))
+      (run-at-time 0.005 nil 'chip8--run))))
 
 (defun chip8--step (emulator)
   "Run a single step of fetch/decode of the EMULATOR."
   (let* ((nimbles (chip8--fetch16 emulator))
-         (opcode (logand nimbles #xF000)))
+         (opcode (logand nimbles #xF000))
+         (opcode3 (logand nimbles #xFFF0)))
     ;; (message "[0x%04X: 0x%04X] i: 0x%04X \n\tregisters: %S\n\tstack: %S"
     ;;          (chip8-pc emulator)
     ;;          nimbles
@@ -477,6 +500,37 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; The interpreter sets the program counter to the address at the top of
       ;; the stack, then subtracts 1 from the stack pointer.
       (setf (chip8-pc emulator) (pop (chip8-stack emulator))))
+     ((eq nimbles #x00FE)
+      ;; 00FD - Exit
+      (chip8-quit))
+     ((eq nimbles #x00FE)
+      ;; 00FE - Disable hires
+      (setf (chip8-display-scale emulator) 2
+            (chip8-display-width emulator) (/ chip8/SCREEN-WIDTH 2)
+            (chip8-display-height emulator) (/ chip8/SCREEN-HEIGHT 2))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq nimbles #x00FF)
+      ;; 00FF - Enable hires
+      (setf (chip8-display-scale emulator) 1
+            (chip8-display-width emulator) chip8/SCREEN-WIDTH
+            (chip8-display-height emulator) chip8/SCREEN-HEIGHT)
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq nimbles #x00FB)
+      ;; 00FB - Scroll right by 4 pixels; in low resolution mode, 2 pixels
+      (chip8--scroll-right (/ 4 (chip8-display-scale emulator))
+                           (chip8-current-canvas emulator))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq nimbles #x00FC)
+      ;; 00FC - Scroll left by 4 pixels; in low resolution mode, 2 pixels
+      (chip8--scroll-left (/ 4 (chip8-display-scale emulator))
+                          (chip8-current-canvas emulator))
+      (cl-incf (chip8-pc emulator) 2))
+     ((eq opcode3 #x00C0)
+      ;; 00CN: Scroll display N pixels down; in low resolution mode, N/2 pixels
+      (chip8--scroll-down (/ (logand nimbles #x000F)
+                             (chip8-display-scale emulator))
+                          (chip8-current-canvas emulator))
+      (cl-incf (chip8-pc emulator) 2))
      ((eq opcode #x0000)
       ;; 0nnn - SYS addr
       ;; Jump to a machine code routine at nnn.
@@ -503,12 +557,25 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq opcode #xD000)
       ;; Dxyn - DRW Vx, Vy, nibble
       ;; Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
-      (let* ((x (mod (chip8--vx emulator nimbles) chip8/SCREEN-WIDTH))
-             (y (mod (chip8--vy emulator nimbles) chip8/SCREEN-HEIGHT))
+      (let* ((x (mod (chip8--vx emulator nimbles) (chip8-display-width emulator)))
+             (y (mod (chip8--vy emulator nimbles) (chip8-display-height emulator)))
              (n (logand nimbles #x000F))
-             (sprite (chip8--read-bytes emulator n (chip8-i emulator)))
-             (hit? (chip8--draw-sprite emulator x y n sprite)))
-        (setf (aref (chip8-v emulator) #xF) (if hit? #x1 #x0))
+             (tall n)
+             (wide 8)
+             (count-collisions (chip8-quirks-count-collisions (chip8-quirks emulator)))
+             sprite collisions)
+        ;; TODO: (chip8--hires? emulator)
+        ;; TODO: (chip8--lores? emulator)
+        ;; Dxy0 - 16x16 pixels sprite in superchip hires mode
+        (when (and (eq (chip8-display-scale emulator) #x1) (eq n 0))
+            (setq n 32
+                  wide 16
+                  tall 16))
+        (setq sprite (chip8--read-bytes emulator n (chip8-i emulator))
+              collisions (chip8--draw-sprite emulator x y tall wide sprite count-collisions))
+        (setf (aref (chip8-v emulator) #xF) (if count-collisions
+                                                (logand collisions #xFF)
+                                              (when (> collisions 0) #x0 #x1)))
         (cl-incf (chip8-pc emulator) 2)))
      ((eq opcode #x7000)
       ;; 7xkk - ADD Vx, byte
@@ -592,6 +659,11 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set I = location of sprite for digit Vx.
           (setf (chip8-i emulator) (+ chip8/FONT-ADDRESS (* (chip8--vx emulator nimbles) 5)))
           (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x30)
+          ;; FX30 - Point I to 10-byte font sprite for digit VX (only digits 0-9)
+          ;; (when (< (chip8--vx emulator nimbles) #xA)
+          ;;   (setf (chip8-i emulator) (+ chip8/HIRES-FONT-ADDRESS (* (chip8--vx emulator nimbles) 10))))
+          (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x33)
           ;; Fx33 - LD B, Vx
           ;; Store BCD representation of Vx in memory locations I, I+1, and I+2.
@@ -641,6 +713,14 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
               (if (chip8-quirks-increment-i-by-x (chip8-quirks emulator))
                   (setf (chip8-i emulator) (+ (chip8-i emulator) vx))
                 (setf (chip8-i emulator) (+ (chip8-i emulator) vx 1)))))
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x75)
+          ;; Fx75 - Store V0..VX in RPL user flags (X <= 7)
+          ;; TODO: implement this, how? RPL should be persistent?
+          (cl-incf (chip8-pc emulator) 2))
+         ((eq last-byte #x85)
+          ;; Fx85 - Read V0..VX from RPL user flags (X <= 7)
+          ;; TODO: implement this, how? RPL should be persistent?
           (cl-incf (chip8-pc emulator) 2))
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      ((eq opcode #x8000)
@@ -751,43 +831,164 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
 
-(defun chip8--draw-sprite (emulator x y n sprite)
-  "Draw SPRITE made of N bytes on EMULATOR's canvas at coordinates (X, Y).
+(defun chip8--draw-sprite (emulator x y tall wide sprite count-clipped)
+  "Draw SPRITE on EMULATOR's canvas at coordinates (X, Y).
 
-A sprite is 8 pixel wide and N pixel tall (where N is the number
-of bytes), every byte is a line of the sprite, every bit of the
-byte is a pixel, if the bit is 1 then we need to turn \"on\" the
-corresponding pixel, otherwise we need to turn it \"off\".
+The sprite is TALL bits tall and WIDE bits wide. In hires mode
+the sprite is always 8 bits wide and TALL (< 15) bits tall. In
+hires mode the sprite can be 16 bits wide and TALL (<= 16) bits
+tall.
 
-Returns a boolean value indicating if there was a collision (aka
-if any pixel on the CANVAS was turned off)."
-  (let ((collision? nil)
+Every bit of the sprite is a pixel, if the bit is 1 then we need
+to turn \"on\" the corresponding pixel, otherwise we need to turn
+it \"off\".
+
+Returns the number of collisions (aka if any pixel on the CANVAS
+was turned off) plus the number of rows clipped at the bottom of
+the screen if COUNT-CLIPPED is t."
+  (let ((collisions 0)
         (canvas-pixels (retro-canvas-pixels (chip8-current-canvas emulator)))
         (canvas-width (retro-canvas-width (chip8-current-canvas emulator)))
-        (sprite-index (* n 8))
+        (sprite-bits (* tall wide))
+        (sprite-index (* tall wide))
+        (sprite-rows-with-collision (make-vector tall #x0))
+        (display-scale (chip8-display-scale emulator))
+        (display-width (chip8-display-width emulator))
+        (display-height (chip8-display-height emulator))
         canvas-pixel
         sprite-pixel
-        xi yi)
-    (dotimes (yd n)
-      (dotimes (xd 8)
+        sprite-row
+        xi yi xj yj)
+    (when count-clipped
+      (cl-incf collisions (min 0 (- (+ y (/ tall 8)) display-height))))
+    (dotimes (yd tall)
+      (dotimes (xd wide)
         (setq xi (+ x xd)
               yi (+ y yd)
-              sprite-index (1- sprite-index))
+              sprite-index (1- sprite-index)
+              sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
         (when (chip8-quirks-wrap (chip8-quirks emulator))
-          (setq xi (mod xi chip8/SCREEN-WIDTH)
-                yi (mod yi chip8/SCREEN-HEIGHT)))
-        (when (and (< xi chip8/SCREEN-WIDTH) (< yi chip8/SCREEN-HEIGHT))
-          (setq canvas-pixel (retro-canvas-pixels-pixel xi yi canvas-pixels canvas-width)
-                sprite-pixel (ash (logand sprite (ash #x1 sprite-index)) (- sprite-index)))
-          (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
-            (setq collision? t))
-          (retro--plot-pixel
-           xi
-           yi
-           (logxor canvas-pixel sprite-pixel)
-           canvas-pixels
-           canvas-width))))
-    collision?))
+          (setq xi (mod xi display-width)
+                yi (mod yi display-height)))
+        (when (and (< xi display-width) (< yi display-height))
+          (dotimes (ys display-scale)
+            (dotimes (xs display-scale)
+             (setq xj (+ (* xi display-scale) xs)
+                   yj (+ (* yi display-scale) ys)
+                   canvas-pixel (retro-canvas-pixels-pixel xj yj canvas-pixels canvas-width))
+             (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
+               (setq sprite-row (/ (- sprite-bits (1+ sprite-index)) wide))
+               (setf (aref sprite-rows-with-collision sprite-row) #x1))
+             (retro--plot-pixel
+              xj
+              yj
+              (logxor canvas-pixel sprite-pixel)
+              canvas-pixels
+              canvas-width))))))
+    (+ collisions (apply '+ (seq-into sprite-rows-with-collision 'list)))))
+
+;;; TODO: write tests
+;;; TODO: use background color
+(defun chip8--scroll-down (n canvas)
+  "Scroll N pixels down what's represented in CANVAS."
+  (let ((pixels (retro-canvas-pixels canvas))
+        (width (retro-canvas-width canvas)))
+    (setf (retro-canvas-pixels canvas)
+          (vconcat
+           (make-vector (* n width) #x0)
+           (seq-subseq pixels 0 (- (length pixels) (* n width)))))))
+
+;;; TODO: write tests
+;;; TODO: use background color
+(defun chip8--scroll-up (n canvas)
+  "Scroll N pixels down what's represented in CANVAS."
+  (let ((pixels (retro-canvas-pixels canvas))
+        (width (retro-canvas-width canvas)))
+    (setf (retro-canvas-pixels canvas)
+          (vconcat
+           (seq-subseq pixels (* n width))
+           (make-vector (* n width) #x0)))))
+
+;;; TODO: write tests
+;;; TODO: use background color
+(defun chip8--scroll-right (n canvas)
+  "Scroll N pixels right what's represented in CANVAS."
+  (let ((pixels (retro-canvas-pixels canvas))
+        (width (retro-canvas-width canvas))
+        (height (retro-canvas-height canvas)))
+    (setf (retro-canvas-pixels canvas)
+          (apply 'vconcat
+                 (cl-loop for i below height
+                          for rows = (cons (vconcat (make-vector n #x0)
+                                                    (seq-subseq pixels (* i width) (- (* (1+ i) width) n)))
+                                            rows)
+                          finally (return (seq-reverse rows)))))))
+
+;;; TODO: write tests
+;;; TODO: use background color
+(defun chip8--scroll-left (n canvas)
+  "Scroll N pixels left what's represented in CANVAS."
+  (let ((pixels (retro-canvas-pixels canvas))
+        (width (retro-canvas-width canvas))
+        (height (retro-canvas-height canvas)))
+    (setf (retro-canvas-pixels canvas)
+          (apply 'vconcat
+                 (cl-loop for i below height
+                          for rows = (cons (vconcat (seq-subseq pixels (+ (* i width) n) (* (1+ i) width))
+                                                    (make-vector n #x0))
+                                            rows)
+                          finally (return (seq-reverse rows)))))))
+
+;; (apply '+ '(1 2 3))
+
+;; (cl-loop for i from 0 below 10
+;;          for rows = (cons i rows)
+;;          finally (return (seq-reverse rows)))
+
+;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
+;;   (retro--plot-pixel 0 0 #x1 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 1 0 #x2 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 2 0 #x3 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 3 0 #x4 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 4 0 #x5 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 5 0 #x6 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 6 0 #x7 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 7 0 #x8 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 8 0 #x9 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 9 0 #xA (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (chip8--scroll-left 4 canvas)
+;;   (retro-canvas-pixels canvas))
+
+
+;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
+;;   (retro--plot-pixel 0 0 #x1 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 1 0 #x2 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 2 0 #x3 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 3 0 #x4 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 4 0 #x5 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 5 0 #x6 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 6 0 #x7 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 7 0 #x8 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 8 0 #x9 (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (retro--plot-pixel 9 0 #xA (retro-canvas-pixels canvas) (retro-canvas-width canvas))
+;;   (chip8--scroll-left 4 canvas)
+;;   (retro-canvas-pixels canvas))
+
+;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
+;;   (chip8--scroll-right 1 canvas)
+;;   (retro-canvas-pixels canvas))
+
+;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
+;;   (chip8--scroll-right 1 canvas)
+;;   (retro-canvas-pixels canvas))
+
+
+;; (let ((v (make-vector 10 0)))
+;;   (setf (seq-subseq v 0 2) (make-vector 2 1)))
+
+;; (let ((canvas (retro-canvas-create :margin-left 0 :margin-top 0 :width 10 :height 10 :background-color #x1)))
+;;   (chip8--scroll-up 1 canvas)
+;;   (retro-canvas-pixels canvas))
 
 (defun chip8--fetch16 (emulator)
   "Fetch 16 bits from EMULATOR's RAM at PC."
@@ -805,7 +1006,6 @@ if any pixel on the CANVAS was turned off)."
 
 (defun chip8--write-bytes (emulator bytes n address)
   "Write N BYTES to EMULATOR's RAM at ADDRESS."
-  ;; (message "chip8--write-bytes 0x%04X %d 0x%04X" bytes n address)
   (let ((mask (ash #xFF (* (- n 1) 8))))
     (dotimes (i n)
       (setf (aref (chip8-ram emulator) (+ i address))
