@@ -860,7 +860,7 @@ the screen if COUNT-CLIPPED is t."
         sprite-row
         xi yi xj yj)
     (when count-clipped
-      (cl-incf collisions (min 0 (- (+ y (/ tall 8)) display-height))))
+      (cl-incf collisions (max 0 (- (+ y (/ tall 8)) display-height))))
     (dotimes (yd tall)
       (dotimes (xd wide)
         (setq xi (+ x xd)
