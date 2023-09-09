@@ -29,7 +29,7 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'retro)
+(require 'ht)
 
 ;;; TODO: remove
 (defun chip8/example ()
@@ -271,6 +271,10 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
   (display-width nil :documentation "Pixels width of the display")
   (display-height nil :documentation "Pixels height of the display"))
 
+(defgroup chip8 nil
+  "A CHIP-8 emulator."
+  :group 'games)
+
 (defvar chip8-configure-on-sha1-alist
   '(("9df1689015a0d1d95144f141903296f9f1c35fc5" .
      ((:filename . "BC_test.ch8")
@@ -408,9 +412,9 @@ the PLACE of this register in EMULATOR."
   "Setup game with rom FILENAME and QUIRKS.
 
 Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
-  (retro--init-color-palette chip8/COLORS 0)
+  (chip8--retro-init-color-palette chip8/COLORS 0)
   (let ((ram (make-vector chip8/RAM-SIZE 0))
-        (canvas (retro-init-buffer
+        (canvas (chip8--retro-init-buffer
                  chip8/BUFFER-NAME
                  chip8/SCREEN-WIDTH
                  chip8/SCREEN-HEIGHT
@@ -423,7 +427,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      :ram ram
      :quirks quirks
      :current-canvas canvas
-     :previous-canvas (retro-canvas-copy canvas)
+     :previous-canvas (chip8--retro-canvas-copy canvas)
      :display-scale 2
      :display-width (/ chip8/SCREEN-WIDTH 2)
      :display-height (/ chip8/SCREEN-HEIGHT 2))))
@@ -450,15 +454,15 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
 (defun chip8--run ()
   "Make the current game run."
   (let ((buffer (get-buffer chip8/BUFFER-NAME))
-         (current-canvas nil)
-         (previous-canvas nil)
-         (last-frame-at 0)
-         (instructions-counter 0)
-         (elapsed 0))
+        (current-canvas nil)
+        (previous-canvas nil)
+        (last-frame-at 0)
+        (instructions-counter 0)
+        (elapsed 0))
     ;; it runs only when we are in the emulator buffer
     (when (eq (current-buffer) buffer)
       (when (not chip8--current-instance)
-        (error "Missing emulator instance, this should not happen"))
+        (error "Missing emulator instance (this should not happen)"))
       (setq last-frame-at (chip8-last-frame-at chip8--current-instance)
             current-canvas (chip8-current-canvas chip8--current-instance)
             previous-canvas (chip8-previous-canvas chip8--current-instance))
@@ -469,12 +473,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           (setq instructions-counter (1+ instructions-counter)))
         (setq elapsed (float-time (time-subtract (current-time) last-frame-at))))
       ;; (message "FPS: %f, elapsed: %fs" (/ 1.0 elapsed) elapsed)
-      (retro--buffer-render current-canvas previous-canvas)
-      (retro-canvas-pixels-copy current-canvas previous-canvas)
+      (chip8--retro-buffer-render current-canvas previous-canvas)
+      (chip8--retro-canvas-pixels-copy current-canvas previous-canvas)
       (setf (chip8-last-frame-at chip8--current-instance) (current-time)
             (chip8-delay-timer chip8--current-instance) (max 0 (1- (chip8-delay-timer chip8--current-instance)))
             (chip8-sound-timer chip8--current-instance) (max 0 (1- (chip8-sound-timer chip8--current-instance))))
-      (run-at-time 0.005 nil 'chip8--run))))
+      (run-at-time 0.001 nil 'chip8--run))))
 
 (defun chip8--step (emulator)
   "Run a single step of fetch/decode of the EMULATOR."
@@ -491,7 +495,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq nimbles #x00E0)
       ;; 00E0 - CLS
       ;; Clear the display.
-      (retro--reset-canvas (chip8-current-canvas emulator))
+      (chip8--retro-reset-canvas (chip8-current-canvas emulator))
       (cl-incf (chip8-pc emulator) 2))
      ((eq nimbles #x00EE)
       ;; 00EE - RET
@@ -830,6 +834,11 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
      (t (error "TODO: opcode 0x%04X not yet implemented at 0x%04X" nimbles (chip8-pc emulator))))))
 
+
+(defsubst chip8--retro-plot-pixel (x y color pixels width)
+  "Plot a pixel with COLOR at (X, Y) in CANVAS."
+  (aset pixels (+ (* y width) x) color))
+
 (defun chip8--draw-sprite (emulator x y tall wide sprite count-clipped)
   "Draw SPRITE on EMULATOR's canvas at coordinates (X, Y).
 
@@ -846,8 +855,8 @@ Returns the number of collisions (aka if any pixel on the CANVAS
 was turned off) plus the number of rows clipped at the bottom of
 the screen if COUNT-CLIPPED is t."
   (let ((collisions 0)
-        (canvas-pixels (retro-canvas-pixels (chip8-current-canvas emulator)))
-        (canvas-width (retro-canvas-width (chip8-current-canvas emulator)))
+        (canvas-pixels (chip8--retro-canvas-pixels (chip8-current-canvas emulator)))
+        (canvas-width (chip8--retro-canvas-width (chip8-current-canvas emulator)))
         (sprite-bits (* tall wide))
         (sprite-index (* tall wide))
         (sprite-rows-with-collision (make-vector tall #x0))
@@ -874,11 +883,11 @@ the screen if COUNT-CLIPPED is t."
             (dotimes (xs display-scale)
              (setq xj (+ (* xi display-scale) xs)
                    yj (+ (* yi display-scale) ys)
-                   canvas-pixel (retro-canvas-pixels-pixel xj yj canvas-pixels canvas-width))
+                   canvas-pixel (chip8--retro-canvas-pixels-pixel xj yj canvas-pixels canvas-width))
              (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
                (setq sprite-row (/ (- sprite-bits (1+ sprite-index)) wide))
                (setf (aref sprite-rows-with-collision sprite-row) #x1))
-             (retro--plot-pixel
+             (chip8--retro-plot-pixel
               xj
               yj
               (logxor canvas-pixel sprite-pixel)
@@ -890,9 +899,9 @@ the screen if COUNT-CLIPPED is t."
 ;;; TODO: use background color
 (defun chip8--scroll-down (n canvas)
   "Scroll N pixels down what's represented in CANVAS."
-  (let ((pixels (retro-canvas-pixels canvas))
-        (width (retro-canvas-width canvas)))
-    (setf (retro-canvas-pixels canvas)
+  (let ((pixels (chip8--retro-canvas-pixels canvas))
+        (width (chip8--retro-canvas-width canvas)))
+    (setf (chip8--retro-canvas-pixels canvas)
           (vconcat
            (make-vector (* n width) #x0)
            (seq-subseq pixels 0 (- (length pixels) (* n width)))))))
@@ -901,9 +910,9 @@ the screen if COUNT-CLIPPED is t."
 ;;; TODO: use background color
 (defun chip8--scroll-up (n canvas)
   "Scroll N pixels down what's represented in CANVAS."
-  (let ((pixels (retro-canvas-pixels canvas))
-        (width (retro-canvas-width canvas)))
-    (setf (retro-canvas-pixels canvas)
+  (let ((pixels (chip8--retro-canvas-pixels canvas))
+        (width (chip8--retro-canvas-width canvas)))
+    (setf (chip8--retro-canvas-pixels canvas)
           (vconcat
            (seq-subseq pixels (* n width))
            (make-vector (* n width) #x0)))))
@@ -912,10 +921,10 @@ the screen if COUNT-CLIPPED is t."
 ;;; TODO: use background color
 (defun chip8--scroll-right (n canvas)
   "Scroll N pixels right what's represented in CANVAS."
-  (let ((pixels (retro-canvas-pixels canvas))
-        (width (retro-canvas-width canvas))
-        (height (retro-canvas-height canvas)))
-    (setf (retro-canvas-pixels canvas)
+  (let ((pixels (chip8--retro-canvas-pixels canvas))
+        (width (chip8--retro-canvas-width canvas))
+        (height (chip8--retro-canvas-height canvas)))
+    (setf (chip8--retro-canvas-pixels canvas)
           (apply 'vconcat
                  (cl-loop for i below height
                           for rows = (cons (vconcat (make-vector n #x0)
@@ -927,10 +936,10 @@ the screen if COUNT-CLIPPED is t."
 ;;; TODO: use background color
 (defun chip8--scroll-left (n canvas)
   "Scroll N pixels left what's represented in CANVAS."
-  (let ((pixels (retro-canvas-pixels canvas))
-        (width (retro-canvas-width canvas))
-        (height (retro-canvas-height canvas)))
-    (setf (retro-canvas-pixels canvas)
+  (let ((pixels (chip8--retro-canvas-pixels canvas))
+        (width (chip8--retro-canvas-width canvas))
+        (height (chip8--retro-canvas-height canvas)))
+    (setf (chip8--retro-canvas-pixels canvas)
           (apply 'vconcat
                  (cl-loop for i below height
                           for rows = (cons (vconcat (seq-subseq pixels (+ (* i width) n) (* (1+ i) width))
@@ -1008,6 +1017,293 @@ Return quirks if ROM is found in in associated list
     (setq buffer-file-coding-system 'binary)
     (insert-file-contents-literally filepath nil 0)
     (sha1 (current-buffer))))
+
+;;; The following stuff is vendoring of https://github.com/gabrielelana/retro.el
+
+(defconst chip8--retro-palette-size 65536)
+
+(defvar chip8--retro-palette-faces (make-vector chip8--retro-palette-size 0))
+
+(defvar chip8--retro-palette-colors->index (ht-create))
+
+(defconst chip8--retro-default-face-height 20)
+
+(defvar chip8--retro-square-font-family "Kreative Square SM"
+  "Font family used to create the illusion of pixels.")
+
+(defface chip8--retro-default-face `((t :family ,chip8--retro-square-font-family :height ,chip8--retro-default-face-height))
+  "Face used as default face for retro buffers."
+  :group 'chip8)
+
+(cl-defstruct (chip8--retro-canvas (:constructor chip8--retro-canvas--create)
+                            (:copier nil))
+  "Canvas data structure."
+  (margin-left 0 :type number)
+  (margin-top 0 :type number)
+  (width 0 :type number)
+  (height 0 :type number)
+  (background-color 0 :type number)
+  (pixels nil :type hashmap)
+  (buffer-before-length 0 :type number)
+  (buffer-line-length 0 :type number))
+
+(cl-defun chip8--retro-canvas-create (&key margin-left margin-top width height background-color)
+  "Create CANVAS.
+
+with the following attributes: MARGIN-LEFT, MARGIN-TOP, WIDTH,
+HEIGHT, BACKGROUND-COLOR."
+  (chip8--retro-canvas--create :margin-left margin-left
+                               :margin-top margin-top
+                               :width width
+                               :height height
+                               :background-color background-color
+                               :pixels (make-vector (* width height) background-color)
+                               :buffer-before-length (* (+ margin-left width 1) margin-top)
+                               :buffer-line-length (+ margin-left width 1)))
+
+(defun chip8--retro-canvas-copy (canvas)
+  "Copy CANVAS, no memory is shared."
+  (chip8--retro-canvas-create :margin-left (chip8--retro-canvas-margin-left canvas)
+                              :margin-top (chip8--retro-canvas-margin-top canvas)
+                              :width (chip8--retro-canvas-width canvas)
+                              :height (chip8--retro-canvas-height canvas)
+                              :background-color (chip8--retro-canvas-background-color canvas)))
+
+(defun chip8--retro-canvas-pixels-copy (from to)
+  "Copy pixels in canvas FROM to pixels in canvas TO."
+  (setf (chip8--retro-canvas-pixels to) (copy-sequence (chip8--retro-canvas-pixels from))))
+
+(defun chip8--retro-reset-canvas (canvas)
+  "Clean all CANVAS pixels."
+  (fillarray (chip8--retro-canvas-pixels canvas) (chip8--retro-canvas-background-color canvas)))
+
+(defun chip8--retro-init-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
+  "Setup buffer BUFFER-NAME as retro.el requires.
+
+Will return a retro.el canvas ready to be used as screen with
+retro.el primitives.
+
+Canvas will be initialized with a screen width SCREEN-WIDTH,
+SCREEN-HEIGHT and a background color with index BACKGROUND-COLOR.
+
+When setup is completed will switch to BUFFER-NAME
+if SWITCH-TO-BUFFER-P is t."
+  (select-window (or (get-buffer-window buffer-name)
+                     (selected-window)))
+  (with-current-buffer (get-buffer-create buffer-name)
+    ;; Disable mode-line before calibration
+    (let* ((window (selected-window))
+           ;; NOTE: without switching to buffer, buffer calibration is not
+           ;; reliable, I didn't find a way to make it work but since we don't
+           ;; need precision because we are not looking at the buffer, a dummy
+           ;; but credible calibration will do
+           (calibration (if switch-to-buffer-p
+                            (chip8--retro-calibrate-canvas-in-window
+                             screen-width
+                             screen-height
+                             window)
+                          (list 10 screen-width screen-height)))
+           (pixel-size (nth 0 calibration))
+           (window-width (nth 1 calibration))
+           (window-height (nth 2 calibration)))
+      (when (not calibration) (error "Failed to calibrate pixel size in buffer %s" buffer-name))
+      ;; Buffer settings to not display text but display graphics
+      (erase-buffer)
+      (buffer-disable-undo)
+      (jit-lock-mode -1)
+      (font-lock-mode -1)
+      (mouse-wheel-mode -1)
+      (auto-save-mode -1)
+      ;; (set-buffer-multibyte nil)
+      (setq-local visible-cursor nil
+                  hl-line-mode nil
+                  mode-line-format nil
+                  cursor-type nil
+                  inhibit-modification-hooks t
+                  inhibit-compacting-font-caches t
+                  bidi-inhibit-bpa t
+                  bidi-display-reordering nil
+                  bidi-paragraph-direction 'left-to-right)
+      ;; Buffer initialization with background pixels
+      (goto-char (point-min))
+      (set-face-attribute 'chip8--retro-default-face nil :height pixel-size)
+      (buffer-face-set 'chip8--retro-default-face)
+      (let* ((margin-top (/ (- window-height screen-height) 2))
+             (margin-left (/ (- window-width screen-width) 2))
+             (canvas (chip8--retro-canvas-create :margin-left margin-left
+                                          :margin-top margin-top
+                                          :width screen-width
+                                          :height screen-height
+                                          :background-color background-color))
+             (margin-top-string (propertize (make-string (+ margin-left screen-width) 32) 'face 'default))
+             (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
+             (canvas-string (propertize (make-string screen-width 32) 'face (aref chip8--retro-palette-faces background-color))))
+        (setq-local buffer-read-only nil)
+        (dotimes (_ margin-top)
+          (insert margin-top-string)
+          (insert "\n"))
+        (dotimes (_ screen-height)
+          (insert margin-left-string)
+          (insert canvas-string)
+          (insert "\n"))
+        (setq-local buffer-read-only t)
+        (when switch-to-buffer-p
+          (switch-to-buffer buffer-name))
+        canvas))))
+
+(defun chip8--retro-calibrate-canvas-in-window (width height window)
+  "Return optimal size of pixel in WINDOW for canvas WIDTH x HEIGHT.
+
+We want to calculate the size in pixel of a single character
+coming from `retro-square-font-family (a pixel of our canvas) so
+that we will minimize the margin of the canvas with the wanted
+resolution in WINDOW."
+  (let* ((min-pixel-size 1)
+         (max-pixel-size 300)
+         (current-pixel-size nil)
+         (result nil)
+         (stop nil))
+    (while (not stop)
+      (setq current-pixel-size (+ (/ (- max-pixel-size min-pixel-size) 2) min-pixel-size))
+      (if (eq min-pixel-size max-pixel-size)
+          (setq stop t)
+        (with-temp-buffer
+          (when display-line-numbers
+            (display-line-numbers-mode -1))
+          (set-window-buffer window (current-buffer))
+          (set-face-attribute 'chip8--retro-default-face nil :height current-pixel-size)
+          (buffer-face-set 'chip8--retro-default-face)
+          ;; TODO (setq-local mode-line-format nil)
+          (let* ((window-width (window-body-width window t))
+                 (font-width (window-font-width window))
+                 ;; window-mode-line-height lies with doom-modeline
+                 ;; TODO: remove this since we remove the modeline when we run?
+                 (mode-line-height (or (and (boundp 'doom-modeline-mode) doom-modeline-mode
+                                            (boundp 'doom-modeline-height) doom-modeline-height)
+                                       (window-mode-line-height window)))
+                 (window-height (- (window-body-height window t) (window-header-line-height window) mode-line-height))
+                 (font-height (window-font-height window))
+                 (n-columns (/ window-width font-width))
+                 (n-lines (floor (/ window-height font-height)))
+                 (waste (+ (- n-columns width) (- n-lines height))))
+            ;; (message "current-pixel-size: %S [%S, %S]" current-pixel-size min-pixel-size max-pixel-size)
+            ;; (message "n-columns: %S (< %S)" n-columns width)
+            ;; (message "n-lines: %S (< %S)" n-lines height)
+            ;; (message "waste: %S (< %S)" waste (and result (car result)))
+            (if (or (< n-columns width) (< n-lines height))
+                ;; current-pixel-size is too big
+                (setq max-pixel-size current-pixel-size)
+              ;; current-pixel-size is ok
+              (if (or (not (car result)) (< waste (car result)))
+                  ;; we did improve
+                  (setq min-pixel-size current-pixel-size
+                        result (list waste current-pixel-size n-columns n-lines))
+                ;; we did not improve, bail
+                (setq stop t))
+              )))))
+    (set-face-attribute 'chip8--retro-default-face nil :height chip8--retro-default-face-height)
+    (cdr result)))
+
+(defun chip8--retro-init-color-palette (colors offset)
+  "Initialize retro palette with COLORS starting from OFFSET."
+  ;; TODO: colors are list of three color components RGB
+  ;; TODO: explain offet
+  (setq chip8--retro-palette-faces (make-vector chip8--retro-palette-size 0))
+  (setq chip8--retro-palette-colors->index (ht-create))
+  (dotimes (i (length colors))
+    (let* ((color (aref colors i))
+           (color-hex (format "#%02X%02X%02X"
+                              (nth 0 color)
+                              (nth 1 color)
+                              (nth 2 color)))
+           (palette-index (+ offset i))
+           (face-name (intern (format "chip8--retro-mode-face-%s" (substring color-hex 1)))))
+      (eval `(defface ,face-name
+               '((t :inherit chip8--retro-default-face :background ,color-hex))
+               ,(format "Face for pixel with color %s" color-hex)
+               :group 'chip8))
+      (aset chip8--retro-palette-faces palette-index face-name)
+      (ht-set! chip8--retro-palette-colors->index color-hex palette-index))))
+
+(defun chip8--retro-buffer-render (current-canvas previous-canvas)
+  "Render CURRENT-CANVAS given PREVIOUS-CANVAS into current buffer."
+  (let* ((cpxs (chip8--retro-canvas-pixels current-canvas))
+         (ppxs (chip8--retro-canvas-pixels previous-canvas))
+         (width (chip8--retro-canvas-width current-canvas))
+         (height (chip8--retro-canvas-height current-canvas))
+         (bll (chip8--retro-canvas-buffer-line-length current-canvas))
+         (cl (* width height))          ; canvas length
+         (column 0)
+         (bbcll (+ (chip8--retro-canvas-buffer-before-length current-canvas)
+                   (chip8--retro-canvas-margin-left current-canvas)
+                   1))
+         (start 0)
+         (buffer-start nil)
+         (buffer-end nil)
+         (length 0)
+         (cpc nil)                      ; current-canvas previous color
+         (ccc nil)                      ; current-canvas current color
+         (pcc nil)                      ; previous-canvas current color
+         (i 0))
+    (setq-local buffer-read-only nil)
+    (catch 'stop
+      (while (< i cl)
+        ;; line routine
+        (setq cpc ccc
+              ccc (aref cpxs i)
+              pcc (aref ppxs i))
+        ;; if previous canvas pixel and current canvas pixel are the same
+        (while (and (eq ccc pcc) (< column width))
+          ;; skip those pixels and do nothing, the current canvas is ok as it is
+          (setq i (1+ i)
+                column (1+ column)
+                cpc ccc)
+          (when (>= i cl)
+            (throw 'stop nil))
+          (setq ccc (aref cpxs i)
+                pcc (aref ppxs i)))
+        ;; start a stroke
+        (when (< column width)
+          (setq start column
+                length 1
+                i (1+ i)
+                column (1+ column)
+                cpc ccc)
+          (when (>= i cl)
+            (throw 'stop nil))
+          (setq ccc (aref cpxs i)))
+        ;; if previous pixel and current pixel are the same
+        (while (and (eq cpc ccc) (< column width))
+          ;; accumulate pixels in the current stroke
+          (setq i (1+ i)
+                column (1+ column)
+                length (1+ length)
+                cpc ccc)
+          (when (>= i cl)
+            (throw 'stop nil))
+          (setq ccc (aref cpxs i)))
+        ;; plot the stroke
+        (setq buffer-start (+ bbcll start)
+              buffer-end (+ buffer-start length))
+        (put-text-property buffer-start buffer-end 'face (aref chip8--retro-palette-faces cpc))
+        (setq length 0
+              start 0)
+        ;; next line
+        (when (>= column width)
+          (setq column 0
+                cpc nil
+                ccc nil
+                pcc nil
+                bbcll (+ bbcll bll)))))
+    (when (> length 0)
+      (setq buffer-start (+ bbcll start)
+            buffer-end (+ buffer-start length))
+      (put-text-property buffer-start buffer-end 'face (aref chip8--retro-palette-faces cpc)))
+    (setq-local buffer-read-only t)))
+
+(defun chip8--retro-canvas-pixels-pixel (x y pixels width)
+  "Get pixel color at (X, Y) in PIXELS with a certain WIDTH."
+  (aref pixels (+ (* y width) x)))
 
 (provide 'chip8)
 
