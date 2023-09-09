@@ -1,4 +1,4 @@
-;;; chip8.el --- A CHIP-8 emulator written in EmacsLisp running in Emacs -*- lexical-binding: t -*-
+;;; chip8.el --- A CHIP-8 emulator -*- lexical-binding: t -*-
 
 ;; Author: Gabriele Lana <gabriele.lana@gmail.com>
 ;; Maintainer: Gabriele Lana <gabriele.lana@gmail.com>
@@ -24,7 +24,7 @@
 
 ;;; Commentary:
 
-;; A CHIP-8 emulator written in EmacsLisp running in Emacs
+;; A CHIP-8 emulator
 
 ;;; Code:
 
@@ -32,45 +32,45 @@
 (require 'ht)
 
 ;;; TODO: remove
-(defun chip8/example ()
+(defun chip8--example ()
   "This is an example."
   2)
 
 ;;; TODO: documentation
-(defconst chip8/SCREEN-WIDTH 128)
-(defconst chip8/SCREEN-HEIGHT 64)
+(defconst chip8-SCREEN-WIDTH 128)
+(defconst chip8-SCREEN-HEIGHT 64)
 
-(defconst chip8/KEY-RELEASE-TIMEOUT 0.15
+(defconst chip8-KEY-RELEASE-TIMEOUT 0.15
   "Time between the keypress event and the simulation of the keyrelease event.")
 
-(defconst chip8/RAM-SIZE 4096
+(defconst chip8-RAM-SIZE 4096
   "Dimension of the RAM.")
 
-(defconst chip8/FRAME-DURATION 0.02
+(defconst chip8-FRAME-DURATION 0.02
   "Duration of a single frame in emuation.")
 
-(defconst chip8/INSTRUCTIONS-PER-FRAME 30
+(defconst chip8-INSTRUCTIONS-PER-FRAME 30
   "Number of instructions to execute per frame.")
 
 ;;; TODO: make the theme configurable
-(defconst chip8/COLORS
+(defconst chip8-COLORS
   ;; [(#x00 #x00 #x00) (#xFF #xFF #xFF)]
   [(#x99 #x66 #x01) (#xFF #xCC #x01)]
   "List of colors supported by the emulator, they are indexed starting from zero.")
 
-(defconst chip8/BUFFER-NAME "*CHIP8-EMULATOR*"
+(defconst chip8-BUFFER-NAME "*chip8-EMULATOR*"
   "The name of the buffer used to show the emulator.")
 
-(defconst chip8/FONT-ADDRESS #x50
+(defconst chip8-FONT-ADDRESS #x50
   "Address where to find/load default font in RAM.")
 
-(defconst chip8/HIRES-FONT-ADDRESS #xA1
+(defconst chip8-HIRES-FONT-ADDRESS #xA1
   "Address where to find/load default hires font in RAM.")
 
-(defconst chip8/ROM-ADDRESS #x200
+(defconst chip8-ROM-ADDRESS #x200
   "Address where to find/load ROM to execute in RAM.")
 
-(defconst chip8/FONT [ #xF0 #x90 #x90 #x90 #xF0 ; 0
+(defconst chip8-FONT [ #xF0 #x90 #x90 #x90 #xF0 ; 0
                        #x20 #x60 #x20 #x20 #x70 ; 1
                        #xF0 #x10 #xF0 #x80 #xF0 ; 2
                        #xF0 #x10 #xF0 #x10 #xF0 ; 3
@@ -89,7 +89,7 @@
                        ]
   "Default font loaded as sprites in CHIP-8 RAM.")
 
-(defconst chip8/HIRES-FONT [ 0x3C, 0x7E, 0xE7, 0xC3, 0xC3, 0xC3, 0xC3, 0xE7, 0x7E, 0x3C, ; 0
+(defconst chip8-HIRES-FONT [ 0x3C, 0x7E, 0xE7, 0xC3, 0xC3, 0xC3, 0xC3, 0xE7, 0x7E, 0x3C, ; 0
                              0x18, 0x38, 0x58, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C, ; 1
                              0x3E, 0x7F, 0xC3, 0x06, 0x0C, 0x18, 0x30, 0x60, 0xFF, 0xFF, ; 2
                              0x3C, 0x7E, 0xC3, 0x03, 0x0E, 0x0E, 0x03, 0xC3, 0x7E, 0x3C, ; 3
@@ -254,7 +254,7 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
 
 (cl-defstruct chip8
   "CHIP-8 emulator state."
-  (ram (make-vector chip8/RAM-SIZE 0) :documentation "4K of ram")
+  (ram (make-vector chip8-RAM-SIZE 0) :documentation "4K of ram")
   (v (make-vector 16 0) :documentation "General purpose registers, 8 bits")
   (i 0 :documentation "Index register, 16 bits")
   (pc 0 :documentation "Program counter, 16 bits")
@@ -322,9 +322,9 @@ Otherwise will run the ROM as the original platform."
   (interactive "ffilename: ")
   (when (or (not (file-exists-p filename)) (not (file-readable-p filename)) (file-directory-p filename))
     (user-error "ROM file %s does not exists or is not readable" filename))
-  (select-window (or (get-buffer-window chip8/BUFFER-NAME)
+  (select-window (or (get-buffer-window chip8-BUFFER-NAME)
                      (selected-window)))
-  (switch-to-buffer chip8/BUFFER-NAME)
+  (switch-to-buffer chip8-BUFFER-NAME)
   (setq chip8--current-rom-filename filename
         chip8--current-quirks (or chip8--current-quirks
                                   (chip8--quirks-from-sha (chip8--sha1-rom filename))
@@ -358,12 +358,12 @@ Otherwise will run the ROM as the original platform."
 (defun chip8--key-press (keycode)
   "Will emulate the key press of KEYCODE in current EMULATOR."
   (aset (chip8-keys chip8--current-instance) keycode (current-time))
-  (run-at-time chip8/KEY-RELEASE-TIMEOUT nil #'chip8--key-release keycode))
+  (run-at-time chip8-KEY-RELEASE-TIMEOUT nil #'chip8--key-release keycode))
 
 (defun chip8--key-release (keycode)
   "Will emulate the key release of KEYCODE in current EMULATOR."
   (let ((key-pressed-at (aref (chip8-keys chip8--current-instance) keycode)))
-    (when (>= (float-time (time-subtract (current-time) key-pressed-at)) chip8/KEY-RELEASE-TIMEOUT)
+    (when (>= (float-time (time-subtract (current-time) key-pressed-at)) chip8-KEY-RELEASE-TIMEOUT)
       (aset (chip8-keys chip8--current-instance) keycode nil))))
 
 (defun chip8--key-pressed-p (keycode emulator)
@@ -406,38 +406,38 @@ the PLACE of this register in EMULATOR."
   (interactive)
   (setq chip8--current-instance nil
         chip8--current-quirks nil)
-  (kill-buffer chip8/BUFFER-NAME))
+  (kill-buffer chip8-BUFFER-NAME))
 
 (defun chip8--setup (filename quirks switch-to-buffer-p)
   "Setup game with rom FILENAME and QUIRKS.
 
 Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
-  (chip8--retro-init-color-palette chip8/COLORS 0)
-  (let ((ram (make-vector chip8/RAM-SIZE 0))
+  (chip8--retro-init-color-palette chip8-COLORS 0)
+  (let ((ram (make-vector chip8-RAM-SIZE 0))
         (canvas (chip8--retro-init-buffer
-                 chip8/BUFFER-NAME
-                 chip8/SCREEN-WIDTH
-                 chip8/SCREEN-HEIGHT
+                 chip8-BUFFER-NAME
+                 chip8-SCREEN-WIDTH
+                 chip8-SCREEN-HEIGHT
                  0
                  switch-to-buffer-p)))
     (chip8--load-default-font ram)
     (chip8--load-rom filename ram)
     (make-chip8
-     :pc chip8/ROM-ADDRESS
+     :pc chip8-ROM-ADDRESS
      :ram ram
      :quirks quirks
      :current-canvas canvas
      :previous-canvas (chip8--retro-canvas-copy canvas)
      :display-scale 2
-     :display-width (/ chip8/SCREEN-WIDTH 2)
-     :display-height (/ chip8/SCREEN-HEIGHT 2))))
+     :display-width (/ chip8-SCREEN-WIDTH 2)
+     :display-height (/ chip8-SCREEN-HEIGHT 2))))
 
 (defun chip8--load-default-font (ram)
   "Load default font in CHIP-8 RAM."
-  (dotimes (i (length chip8/FONT))
-    (aset ram (+ i chip8/FONT-ADDRESS) (aref chip8/FONT i)))
-  (dotimes (i (length chip8/HIRES-FONT))
-    (aset ram (+ i chip8/HIRES-FONT-ADDRESS) (aref chip8/HIRES-FONT i))))
+  (dotimes (i (length chip8-FONT))
+    (aset ram (+ i chip8-FONT-ADDRESS) (aref chip8-FONT i)))
+  (dotimes (i (length chip8-HIRES-FONT))
+    (aset ram (+ i chip8-HIRES-FONT-ADDRESS) (aref chip8-HIRES-FONT i))))
 
 (defun chip8--load-rom (filename ram)
   "Load rom FILENAME in CHIP-8 RAM."
@@ -449,11 +449,11 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
                 (buffer-substring-no-properties (point-min) (point-max)))
               'vector)))
     (dotimes (i (length rom))
-      (aset ram (+ i chip8/ROM-ADDRESS) (aref rom i)))))
+      (aset ram (+ i chip8-ROM-ADDRESS) (aref rom i)))))
 
 (defun chip8--run ()
   "Make the current game run."
-  (let ((buffer (get-buffer chip8/BUFFER-NAME))
+  (let ((buffer (get-buffer chip8-BUFFER-NAME))
         (current-canvas nil)
         (previous-canvas nil)
         (last-frame-at 0)
@@ -466,8 +466,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       (setq last-frame-at (chip8-last-frame-at chip8--current-instance)
             current-canvas (chip8-current-canvas chip8--current-instance)
             previous-canvas (chip8-previous-canvas chip8--current-instance))
-      (while (< elapsed chip8/FRAME-DURATION)
-        (if (>= instructions-counter chip8/INSTRUCTIONS-PER-FRAME)
+      (while (< elapsed chip8-FRAME-DURATION)
+        (if (>= instructions-counter chip8-INSTRUCTIONS-PER-FRAME)
             (sleep-for 0.001)
           (chip8--step chip8--current-instance)
           (setq instructions-counter (1+ instructions-counter)))
@@ -509,14 +509,14 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
      ((eq nimbles #x00FE)
       ;; 00FE - Disable hires
       (setf (chip8-display-scale emulator) 2
-            (chip8-display-width emulator) (/ chip8/SCREEN-WIDTH 2)
-            (chip8-display-height emulator) (/ chip8/SCREEN-HEIGHT 2))
+            (chip8-display-width emulator) (/ chip8-SCREEN-WIDTH 2)
+            (chip8-display-height emulator) (/ chip8-SCREEN-HEIGHT 2))
       (cl-incf (chip8-pc emulator) 2))
      ((eq nimbles #x00FF)
       ;; 00FF - Enable hires
       (setf (chip8-display-scale emulator) 1
-            (chip8-display-width emulator) chip8/SCREEN-WIDTH
-            (chip8-display-height emulator) chip8/SCREEN-HEIGHT)
+            (chip8-display-width emulator) chip8-SCREEN-WIDTH
+            (chip8-display-height emulator) chip8-SCREEN-HEIGHT)
       (cl-incf (chip8-pc emulator) 2))
      ((eq nimbles #x00FB)
       ;; 00FB - Scroll right by 4 pixels; in low resolution mode, 2 pixels
@@ -660,12 +660,12 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
          ((eq last-byte #x29)
           ;; Fx29 - LD F, Vx
           ;; Set I = location of sprite for digit Vx.
-          (setf (chip8-i emulator) (+ chip8/FONT-ADDRESS (* (chip8--vx emulator nimbles) 5)))
+          (setf (chip8-i emulator) (+ chip8-FONT-ADDRESS (* (chip8--vx emulator nimbles) 5)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x30)
           ;; FX30 - Point I to 10-byte font sprite for digit VX (only digits 0-9)
           ;; (when (< (chip8--vx emulator nimbles) #xA)
-          ;;   (setf (chip8-i emulator) (+ chip8/HIRES-FONT-ADDRESS (* (chip8--vx emulator nimbles) 10))))
+          ;;   (setf (chip8-i emulator) (+ chip8-HIRES-FONT-ADDRESS (* (chip8--vx emulator nimbles) 10))))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-byte #x33)
           ;; Fx33 - LD B, Vx
@@ -1077,6 +1077,15 @@ HEIGHT, BACKGROUND-COLOR."
   "Clean all CANVAS pixels."
   (fillarray (chip8--retro-canvas-pixels canvas) (chip8--retro-canvas-background-color canvas)))
 
+(defun chip8--retro-check-requirements ()
+  "Will check environment requirements to make retro run."
+  (when (not (find-font (font-spec :name chip8--retro-square-font-family)))
+    (error
+     (format "Unable to find needed font in current environment. Please install `%s` font so that Emacs can use it." chip8--retro-square-font-family)))
+  (when (not (native-comp-available-p))
+    (warn
+     "Native compilation is not required but it's strongly recommended.")))
+
 (defun chip8--retro-init-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
   "Setup buffer BUFFER-NAME as retro.el requires.
 
@@ -1088,6 +1097,7 @@ SCREEN-HEIGHT and a background color with index BACKGROUND-COLOR.
 
 When setup is completed will switch to BUFFER-NAME
 if SWITCH-TO-BUFFER-P is t."
+  (chip8--retro-check-requirements)
   (select-window (or (get-buffer-window buffer-name)
                      (selected-window)))
   (with-current-buffer (get-buffer-create buffer-name)
@@ -1131,10 +1141,10 @@ if SWITCH-TO-BUFFER-P is t."
       (let* ((margin-top (/ (- window-height screen-height) 2))
              (margin-left (/ (- window-width screen-width) 2))
              (canvas (chip8--retro-canvas-create :margin-left margin-left
-                                          :margin-top margin-top
-                                          :width screen-width
-                                          :height screen-height
-                                          :background-color background-color))
+                                                 :margin-top margin-top
+                                                 :width screen-width
+                                                 :height screen-height
+                                                 :background-color background-color))
              (margin-top-string (propertize (make-string (+ margin-left screen-width) 32) 'face 'default))
              (margin-left-string (propertize (make-string margin-left 32) 'face 'default))
              (canvas-string (propertize (make-string screen-width 32) 'face (aref chip8--retro-palette-faces background-color))))
@@ -1199,8 +1209,7 @@ resolution in WINDOW."
                   (setq min-pixel-size current-pixel-size
                         result (list waste current-pixel-size n-columns n-lines))
                 ;; we did not improve, bail
-                (setq stop t))
-              )))))
+                (setq stop t)))))))
     (set-face-attribute 'chip8--retro-default-face nil :height chip8--retro-default-face-height)
     (cdr result)))
 

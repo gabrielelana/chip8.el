@@ -34,7 +34,7 @@
   (should (equal 2 (+ 1 1))))
 
 (ert-deftest shall-call-library ()
-  (should (equal 2 (chip8/example))))
+  (should (equal 2 (chip8--example))))
 
 (provide 'example-test)
 
