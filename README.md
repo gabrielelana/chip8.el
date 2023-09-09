@@ -27,14 +27,14 @@ By using straight
 
 ```emacs-lisp
 (straight-use-package
-'(chip8 :type git :host github :repo "gabrielelana/emacs-chip-8"))
+'(chip8 :type git :host github :repo "gabrielelana/chip8.el"))
 ```
 
 Manually
 
 - Clone this repository
   ```console
-  $ git clone https://github.com/gabrielelana/emacs-chip-8
+  $ git clone https://github.com/gabrielelana/chip8.el
   ```
 - Inside of Emacs open `chip8.el` file, evaluate buffer with <kbd>M-x
   eval-buffer</kbd> or better, if you have native compilation available,
@@ -85,4 +85,4 @@ Need to implement some XO-Chip features
 
 ## License
 
-[MIT](https://github.com/gabrielelana/emacs-chip-8/blob/master/LICENSE)
+[MIT](https://github.com/gabrielelana/chip8.el/blob/master/LICENSE)
