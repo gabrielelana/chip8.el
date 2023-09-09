@@ -11,7 +11,9 @@ prepare:
 	${CASK} install
 
 test:
-	${CASK} exec ert-runner --load ${SOURCE} test/*-test.el
+	${CASK} emacs --batch -L . -L test \
+		-l example-test \
+		-f ert-run-tests-batch
 
 compile:
 	${CASK} exec ${EMACS} -Q -batch -f batch-byte-compile ${SOURCE}
