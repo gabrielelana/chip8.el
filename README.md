@@ -19,8 +19,6 @@ This is an attempt to write a full emulator able to run in Emacs.
 ![chip8-003](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-003.png 'Astro Dodge')
 ![chip8-004](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-004.png 'Astro Dodge')
 
-TODO: screenshots
-
 ## How to install
 
 We are not on MELPA yet, therefore you need to clone this repository
@@ -51,19 +49,39 @@ Manually
 
 ## How to use
 
-TODO
+To play games you need ROMs, you can find some of them in [this repository](https://github.com/kripod/chip8-roms)
+
+After `chip8.el` is loaded (see [How to
+install](https://github.com/gabrielelana/chip8.el/tree/master#how-to-install))
+you run <kbd>M-x chip8</kbd> then Emacs will ask you the file of the ROM to run.
+
+Chip-8 has many extensions and quirks mode, if the ROM doesn't run correctly,
+then you can choose to run a specific version of the emulator with the following commands.
+
+- <kbd>M-x chip8-original</kbd>
+- <kbd>M-x chip8-modern</kbd>
+- <kbd>M-x chip8-superchip</kbd>
+- <kbd>M-x chip8-xo-chip</kbd>
 
 ## Why
 
-TODO
+Because Emacs can do anything, so why not.
 
 ## How
 
-TODO
+I've experimented for a while on how to do retro graphic in Emacs to implement
+simple games, this led to [a library](https://github.com/gabrielelana/retro.el)
+capable to implement 2D retro games with decent frame rate and resolution.
 
-## Limitations
+Since the library is not ready to be released, I've vendored only the necessary
+code in the emulator.
 
-TODO
+In the future, when (if?) the library will be release I will remove the code and
+have the library as requirement for the emulator.
+
+## Known limitations
+
+Need to implement some XO-Chip features
 
 ## License
 
