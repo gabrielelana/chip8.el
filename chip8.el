@@ -106,23 +106,23 @@
 (defvar chip8-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "q") #'chip8-quit)
-    (define-key map (kbd "0") #'(lambda () (interactive) (chip8--key-press #x0)))
-    (define-key map (kbd "1") #'(lambda () (interactive) (chip8--key-press #x1)))
-    (define-key map (kbd "2") #'(lambda () (interactive) (chip8--key-press #x2)))
-    (define-key map (kbd "3") #'(lambda () (interactive) (chip8--key-press #x3)))
-    (define-key map (kbd "4") #'(lambda () (interactive) (chip8--key-press #x4)))
-    (define-key map (kbd "5") #'(lambda () (interactive) (chip8--key-press #x5)))
-    (define-key map (kbd "6") #'(lambda () (interactive) (chip8--key-press #x6)))
-    (define-key map (kbd "7") #'(lambda () (interactive) (chip8--key-press #x7)))
-    (define-key map (kbd "8") #'(lambda () (interactive) (chip8--key-press #x8)))
-    (define-key map (kbd "9") #'(lambda () (interactive) (chip8--key-press #x9)))
-    (define-key map (kbd "a") #'(lambda () (interactive) (chip8--key-press #xA)))
-    (define-key map (kbd "b") #'(lambda () (interactive) (chip8--key-press #xB)))
-    (define-key map (kbd "c") #'(lambda () (interactive) (chip8--key-press #xC)))
-    (define-key map (kbd "d") #'(lambda () (interactive) (chip8--key-press #xD)))
-    (define-key map (kbd "e") #'(lambda () (interactive) (chip8--key-press #xE)))
-    (define-key map (kbd "f") #'(lambda () (interactive) (chip8--key-press #xF)))
-    (define-key map [t] 'ignore)
+    (define-key map (kbd "0") (lambda () (interactive) (chip8--key-press #x0)))
+    (define-key map (kbd "1") (lambda () (interactive) (chip8--key-press #x1)))
+    (define-key map (kbd "2") (lambda () (interactive) (chip8--key-press #x2)))
+    (define-key map (kbd "3") (lambda () (interactive) (chip8--key-press #x3)))
+    (define-key map (kbd "4") (lambda () (interactive) (chip8--key-press #x4)))
+    (define-key map (kbd "5") (lambda () (interactive) (chip8--key-press #x5)))
+    (define-key map (kbd "6") (lambda () (interactive) (chip8--key-press #x6)))
+    (define-key map (kbd "7") (lambda () (interactive) (chip8--key-press #x7)))
+    (define-key map (kbd "8") (lambda () (interactive) (chip8--key-press #x8)))
+    (define-key map (kbd "9") (lambda () (interactive) (chip8--key-press #x9)))
+    (define-key map (kbd "a") (lambda () (interactive) (chip8--key-press #xA)))
+    (define-key map (kbd "b") (lambda () (interactive) (chip8--key-press #xB)))
+    (define-key map (kbd "c") (lambda () (interactive) (chip8--key-press #xC)))
+    (define-key map (kbd "d") (lambda () (interactive) (chip8--key-press #xD)))
+    (define-key map (kbd "e") (lambda () (interactive) (chip8--key-press #xE)))
+    (define-key map (kbd "f") (lambda () (interactive) (chip8--key-press #xF)))
+    (define-key map [t] #'ignore)
     map)
   "Keymap for `chip8-mode'.")
 
@@ -299,7 +299,7 @@ alist with the following recognized keys
                                  chip8--current-rom-filename
                                  chip8--current-quirks
                                  t))
-  (run-at-time 0.001 nil 'chip8--run))
+  (run-at-time 0.001 nil #'chip8--run))
 
 (defun chip8 (filename)
   "Run chip8 emulation with FILENAME ROM.
@@ -368,7 +368,7 @@ Otherwise will run the ROM as the original platform."
   "Return keycode of first pressed key in EMULATOR, nil otherwise."
   (cl-loop for element across (chip8-keys emulator)
            for index from 0
-           until (not (eq element nil))
+           until element
            finally (return (if element index nil))))
 
 (defmacro chip8--vx (emulator nimbles)
@@ -470,7 +470,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       (setf (chip8-last-frame-at chip8--current-instance) (current-time)
             (chip8-delay-timer chip8--current-instance) (max 0 (1- (chip8-delay-timer chip8--current-instance)))
             (chip8-sound-timer chip8--current-instance) (max 0 (1- (chip8-sound-timer chip8--current-instance))))
-      (run-at-time 0.001 nil 'chip8--run))))
+      (run-at-time 0.001 nil #'chip8--run))))
 
 (defun chip8--step (emulator)
   "Run a single step of fetch/decode of the EMULATOR."
@@ -885,10 +885,10 @@ the screen if COUNT-CLIPPED is t."
               (logxor canvas-pixel sprite-pixel)
               canvas-pixels
               canvas-width))))))
-    (+ collisions (apply '+ (seq-into sprite-rows-with-collision 'list)))))
+    (+ collisions (apply #'+ (seq-into sprite-rows-with-collision 'list)))))
 
-;;; TODO: write tests
-;;; TODO: use background color
+;; TODO: write tests
+;; TODO: use background color
 (defun chip8--scroll-down (n canvas)
   "Scroll N pixels down what's represented in CANVAS."
   (let ((pixels (chip8--retro-canvas-pixels canvas))
@@ -898,8 +898,8 @@ the screen if COUNT-CLIPPED is t."
            (make-vector (* n width) #x0)
            (seq-subseq pixels 0 (- (length pixels) (* n width)))))))
 
-;;; TODO: write tests
-;;; TODO: use background color
+;; TODO: write tests
+;; TODO: use background color
 (defun chip8--scroll-up (n canvas)
   "Scroll N pixels down what's represented in CANVAS."
   (let ((pixels (chip8--retro-canvas-pixels canvas))
@@ -909,30 +909,30 @@ the screen if COUNT-CLIPPED is t."
            (seq-subseq pixels (* n width))
            (make-vector (* n width) #x0)))))
 
-;;; TODO: write tests
-;;; TODO: use background color
+;; TODO: write tests
+;; TODO: use background color
 (defun chip8--scroll-right (n canvas)
   "Scroll N pixels right what's represented in CANVAS."
   (let ((pixels (chip8--retro-canvas-pixels canvas))
         (width (chip8--retro-canvas-width canvas))
         (height (chip8--retro-canvas-height canvas)))
     (setf (chip8--retro-canvas-pixels canvas)
-          (apply 'vconcat
+          (apply #'vconcat
                  (cl-loop for i below height
                           for rows = (cons (vconcat (make-vector n #x0)
                                                     (seq-subseq pixels (* i width) (- (* (1+ i) width) n)))
                                             rows)
                           finally (return (seq-reverse rows)))))))
 
-;;; TODO: write tests
-;;; TODO: use background color
+;; TODO: write tests
+;; TODO: use background color
 (defun chip8--scroll-left (n canvas)
   "Scroll N pixels left what's represented in CANVAS."
   (let ((pixels (chip8--retro-canvas-pixels canvas))
         (width (chip8--retro-canvas-width canvas))
         (height (chip8--retro-canvas-height canvas)))
     (setf (chip8--retro-canvas-pixels canvas)
-          (apply 'vconcat
+          (apply #'vconcat
                  (cl-loop for i below height
                           for rows = (cons (vconcat (seq-subseq pixels (+ (* i width) n) (* (1+ i) width))
                                                     (make-vector n #x0))
@@ -1071,10 +1071,10 @@ HEIGHT, BACKGROUND-COLOR."
   "Will check environment requirements to make retro run."
   (when (not (find-font (font-spec :name chip8--retro-square-font-family)))
     (error
-     (format "Unable to find needed font in current environment. Please install `%s` font so that Emacs can use it." chip8--retro-square-font-family)))
+     "Unable to find needed font in current environment. Please install `%s` font so that Emacs can use it" chip8--retro-square-font-family))
   (when (not (native-comp-available-p))
     (warn
-     "Native compilation is not required but it's strongly recommended.")))
+     "Native compilation is not required but it's strongly recommended")))
 
 (defun chip8--retro-init-buffer (buffer-name screen-width screen-height background-color switch-to-buffer-p)
   "Setup buffer BUFFER-NAME as retro.el requires.
