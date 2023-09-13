@@ -5,8 +5,6 @@
 
 (files "*.el")
 
-(depends-on "retro" :git "https://github.com/gabrielelana/retro.el")
-(depends-on "ht" "2.0.0")
 (depends-on "cl-lib")
 
 (development

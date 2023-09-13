@@ -29,7 +29,6 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'ht)
 
 ;;; TODO: remove
 (defun chip8--example ()
@@ -1024,8 +1023,6 @@ Return quirks if ROM is found in in associated list
 
 (defvar chip8--retro-palette-faces (make-vector chip8--retro-palette-size 0))
 
-(defvar chip8--retro-palette-colors->index (ht-create))
-
 (defconst chip8--retro-default-face-height 20)
 
 (defvar chip8--retro-square-font-family "Kreative Square SM"
@@ -1218,7 +1215,6 @@ resolution in WINDOW."
   ;; TODO: colors are list of three color components RGB
   ;; TODO: explain offet
   (setq chip8--retro-palette-faces (make-vector chip8--retro-palette-size 0))
-  (setq chip8--retro-palette-colors->index (ht-create))
   (dotimes (i (length colors))
     (let* ((color (aref colors i))
            (color-hex (format "#%02X%02X%02X"
@@ -1231,8 +1227,7 @@ resolution in WINDOW."
                '((t :inherit chip8--retro-default-face :background ,color-hex))
                ,(format "Face for pixel with color %s" color-hex)
                :group 'chip8))
-      (aset chip8--retro-palette-faces palette-index face-name)
-      (ht-set! chip8--retro-palette-colors->index color-hex palette-index))))
+      (aset chip8--retro-palette-faces palette-index face-name))))
 
 (defun chip8--retro-buffer-render (current-canvas previous-canvas)
   "Render CURRENT-CANVAS given PREVIOUS-CANVAS into current buffer."
