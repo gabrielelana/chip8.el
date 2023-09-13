@@ -301,6 +301,7 @@ alist with the following recognized keys
                                  t))
   (run-at-time 0.001 nil #'chip8--run))
 
+;;;###autoload
 (defun chip8 (filename)
   "Run chip8 emulation with FILENAME ROM.
 
@@ -323,24 +324,28 @@ Otherwise will run the ROM as the original platform."
                                   chip8--original-quirks))
   (chip8-mode))
 
+;;;###autoload
 (defun chip8-original (filename)
   "Run chip8 emulation loading FILENAME rom with original Cosmac VIP CHIP-8 quirks."
   (interactive "ffilename: ")
   (setq chip8--current-quirks chip8--original-quirks)
   (chip8 filename))
 
+;;;###autoload
 (defun chip8-modern (filename)
   "Run chip8 emulation loading FILENAME rom with modern CHIP-8 quirks."
   (interactive "ffilename: ")
   (setq chip8--current-quirks chip8--modern-quirks)
   (chip8 filename))
 
+;;;###autoload
 (defun chip8-superchip (filename)
   "Run chip8 emulation loading FILENAME rom with superchip CHIP-8 quirks."
   (interactive "ffilename: ")
   (setq chip8--current-quirks chip8--superchip-quirks)
   (chip8 filename))
 
+;;;###autoload
 (defun chip8-xo-chip (filename)
   "Run chip8 emulation loading FILENAME rom with superchip CHIP-8 quirks."
   (interactive "ffilename: ")
