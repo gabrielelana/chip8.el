@@ -14,16 +14,20 @@ are still being made to this day."
 
 This is an attempt to write a full emulator able to run in Emacs.
 
-![chip8-001](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-001.png 'Timendus')
-![chip8-002](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-002.png 'Timendus')
-![chip8-003](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-003.png 'Astro Dodge')
-![chip8-004](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-004.png 'Astro Dodge')
+![chip8-001](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-001.png "Timendus")
+![chip8-002](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-002.png "Timendus")
+![chip8-003](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-003.png "Astro Dodge")
+![chip8-004](https://github.com/gabrielelana/chip8.el/blob/6519ba638ebbef793084340a1ccebc252215bc48/assets/chip8-004.png "Astro Dodge")
 
 ## How to install
 
-We are not on MELPA yet, therefore you need to clone this repository
+Install the stable version using straight from MELPA
 
-By using straight
+```emacs-lisp
+(straight-use-package chip8)
+```
+
+Install the development version using straight
 
 ```emacs-lisp
 (straight-use-package
