@@ -123,11 +123,10 @@ if SWITCH-TO-BUFFER-P is t."
       ;; Buffer settings to not display text but display graphics
       (erase-buffer)
       (buffer-disable-undo)
-      (jit-lock-mode -1)
       (font-lock-mode -1)
       (mouse-wheel-mode -1)
       (auto-save-mode -1)
-      ;; (set-buffer-multibyte nil)
+      (set-buffer-multibyte nil)
       (setq-local visible-cursor nil
                   hl-line-mode nil
                   mode-line-format nil
