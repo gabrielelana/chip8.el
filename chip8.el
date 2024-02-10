@@ -793,7 +793,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
       ;; The interpreter sets the program counter to the address at the top of
       ;; the stack, then subtracts 1 from the stack pointer.
       (setf (chip8-pc emulator) (pop (chip8-stack emulator))))
-     ((eq nimbles #x00FE)
+     ((eq nimbles #x00FD)
       ;; 00FD - Exit
       (chip8-quit))
      ((eq nimbles #x00FE)
