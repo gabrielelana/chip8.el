@@ -861,9 +861,9 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
         ;; TODO: (chip8--lores? emulator)
         ;; Dxy0 - 16x16 pixels sprite in superchip hires mode
         (when (and (eq (chip8-display-scale emulator) #x1) (eq n 0))
-            (setq n 32
-                  wide 16
-                  tall 16))
+          (setq n 32
+                wide 16
+                tall 16))
         (setq sprite (chip8--read-bytes emulator n (chip8-i emulator))
               collisions (chip8--draw-sprite emulator x y tall wide sprite count-collisions))
         (setf (aref (chip8-v emulator) #xF) (if count-collisions
@@ -1171,18 +1171,18 @@ the screen if COUNT-CLIPPED is t."
         (when (and (< xi display-width) (< yi display-height))
           (dotimes (ys display-scale)
             (dotimes (xs display-scale)
-             (setq xj (+ (* xi display-scale) xs)
-                   yj (+ (* yi display-scale) ys)
-                   canvas-pixel (chip8--retro-canvas-pixels-pixel xj yj canvas-pixels canvas-width))
-             (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
-               (setq sprite-row (/ (- sprite-bits (1+ sprite-index)) wide))
-               (setf (aref sprite-rows-with-collision sprite-row) #x1))
-             (chip8--retro-plot-pixel
-              xj
-              yj
-              (logxor canvas-pixel sprite-pixel)
-              canvas-pixels
-              canvas-width))))))
+              (setq xj (+ (* xi display-scale) xs)
+                    yj (+ (* yi display-scale) ys)
+                    canvas-pixel (chip8--retro-canvas-pixels-pixel xj yj canvas-pixels canvas-width))
+              (when (and (> canvas-pixel #x0) (> sprite-pixel #x0))
+                (setq sprite-row (/ (- sprite-bits (1+ sprite-index)) wide))
+                (setf (aref sprite-rows-with-collision sprite-row) #x1))
+              (chip8--retro-plot-pixel
+               xj
+               yj
+               (logxor canvas-pixel sprite-pixel)
+               canvas-pixels
+               canvas-width))))))
     (+ collisions (apply #'+ (seq-into sprite-rows-with-collision 'list)))))
 
 ;; TODO: write tests
