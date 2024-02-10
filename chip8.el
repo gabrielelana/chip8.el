@@ -1067,7 +1067,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           (let ((vx (chip8--vx emulator nimbles))
                 (vy (chip8--vy emulator nimbles)))
             (setf (chip8--vx emulator nimbles) (chip8--complement-byte (- vx vy))
-                  (aref (chip8-v emulator) #xF) (if (> vx vy) #x1 #x0)))
+                  (aref (chip8-v emulator) #xF) (if (>= vx vy) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x7)
           ;; 8xy7 - SUBN Vx, Vy
@@ -1075,7 +1075,7 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           (let ((vx (chip8--vx emulator nimbles))
                 (vy (chip8--vy emulator nimbles)))
             (setf (chip8--vx emulator nimbles) (chip8--complement-byte (- vy vx))
-                  (aref (chip8-v emulator) #xF) (if (> vy vx) #x1 #x0)))
+                  (aref (chip8-v emulator) #xF) (if (>= vy vx) #x1 #x0)))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x6)
           ;; 8xy6 - SHR Vx {, Vy}
