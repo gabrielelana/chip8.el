@@ -310,11 +310,6 @@ resolution in WINDOW."
 
 ;;; The previous stuff is vendoring of https://github.com/gabrielelana/retro.el
 
-;;; TODO: remove
-(defun chip8--example ()
-  "This is an example."
-  2)
-
 ;;; TODO: documentation
 (defconst chip8-SCREEN-WIDTH 128)
 (defconst chip8-SCREEN-HEIGHT 64)

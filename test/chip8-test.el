@@ -1,4 +1,4 @@
-;;; example-test.el --- Test example  -*- lexical-binding: t -*-
+;;; chip8.el --- Test example  -*- lexical-binding: t -*-
 
 ;; Author: Gabriele Lana <gabriele.lana@gmail.com>
 ;; Maintainer: Gabriele Lana <gabriele.lana@gmail.com>
@@ -28,22 +28,20 @@
 ;;   (when (not (member chip8-root load-path))
 ;;     (add-to-list 'load-path chip8-root)))
 
+(require 'ert)
 (require 'chip8)
 
 (ert-deftest shall-pass ()
   (should (equal 2 (+ 1 1))))
-
-(ert-deftest shall-call-library ()
-  (should (equal 2 (chip8--example))))
 
 (ert-deftest shall-encode-bytes-in-binary-encoded-decimal ()
   (should (equal '(1 5 6) (chip8--to-bdc 156)))
   (should (equal '(0 1 5) (chip8--to-bdc 15)))
   (should (equal '(0 0 1) (chip8--to-bdc 1))))
 
-(provide 'example-test)
+(provide 'chip8-test)
 
 ;; Local Variables:
 ;; coding: utf-8
 ;; End:
-;;; example-test.el ends here
+;;; chip8-test.el ends here

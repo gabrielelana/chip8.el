@@ -12,7 +12,7 @@ prepare:
 
 test:
 	${CASK} emacs --batch -L . -L test \
-		-l example-test \
+		-l chip8-test \
 		-f ert-run-tests-batch
 
 compile:
