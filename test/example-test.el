@@ -36,6 +36,11 @@
 (ert-deftest shall-call-library ()
   (should (equal 2 (chip8--example))))
 
+(ert-deftest shall-encode-bytes-in-binary-encoded-decimal ()
+  (should (equal '(1 5 6) (chip8--to-bdc 156)))
+  (should (equal '(0 1 5) (chip8--to-bdc 15)))
+  (should (equal '(0 0 1) (chip8--to-bdc 1))))
+
 (provide 'example-test)
 
 ;; Local Variables:

@@ -1266,11 +1266,11 @@ Split decimal value of X in a list of its digits."
   (when (< x 0)
     (error "Cannot encode %d as BDC" x))
   (let ((res '()))
-    (setq res (cons (mod x 10) res)
-          x (floor (/ x 10)))
     (while (> x 0)
       (setq res (cons (mod x 10) res)
             x (floor (/ x 10))))
+    (while (< (length res) 3)
+      (setq res (cons 0 res)))
     res))
 
 (defun chip8--complement-byte (x)
