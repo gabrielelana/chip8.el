@@ -31,14 +31,14 @@ Install the development version using straight
 
 ```emacs-lisp
 (straight-use-package
-'(chip8 :type git :host github :repo "gabrielelana/chip8.el"))
+  '(chip8 :type git :host github :repo "gabrielelana/chip8.el"))
 ```
 
 Manually
 
 - Clone this repository
   ```console
-  $ git clone https://github.com/gabrielelana/chip8.el
+  git clone https://github.com/gabrielelana/chip8.el
   ```
 - Inside of Emacs open `chip8.el` file, evaluate buffer with <kbd>M-x
   eval-buffer</kbd> or better, if you have native compilation available,
@@ -53,7 +53,8 @@ Manually
 
 ## How to use
 
-To play games you need ROMs, you can find some of them in [this repository](https://github.com/kripod/chip8-roms)
+To play games you need ROMs, you can find some of them in [this
+repository](https://github.com/kripod/chip8-roms)
 
 After `chip8.el` is loaded (see [How to
 install](https://github.com/gabrielelana/chip8.el/tree/master#how-to-install))
