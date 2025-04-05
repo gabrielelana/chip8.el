@@ -185,15 +185,9 @@ resolution in WINDOW."
           (set-window-buffer window (current-buffer))
           (set-face-attribute 'chip8--retro-default-face nil :height current-pixel-size)
           (buffer-face-set 'chip8--retro-default-face)
-          ;; TODO (setq-local mode-line-format nil)
           (let* ((window-width (window-body-width window t))
                  (font-width (window-font-width window))
-                 ;; window-mode-line-height lies with doom-modeline
-                 ;; TODO: remove this since we remove the modeline when we run?
-                 (mode-line-height (or (and (boundp 'doom-modeline-mode) doom-modeline-mode
-                                            (boundp 'doom-modeline-height) doom-modeline-height)
-                                       (window-mode-line-height window)))
-                 (window-height (- (window-body-height window t) (window-header-line-height window) mode-line-height))
+                 (window-height (- (window-body-height window t) (window-header-line-height window)))
                  (font-height (window-font-height window))
                  (n-columns (/ window-width font-width))
                  (n-lines (floor (/ window-height font-height)))
