@@ -466,13 +466,14 @@ timers. If t opcode `DXYN` waits for vertical blank (so max 60
 sprites drawn per second). If nil opcode `DXYN` draws
 immediately (number of sprites drawn per second only limited to
 number of CPU cycles per frame).")
-  (logic t :documentation "On the original Cosmac VIP interpreter,
+  (vf-reset t :documentation "On the original Cosmac VIP interpreter,
 `vF` would be reset after each opcode that would invoke the maths
-coprocessor. Later interpreters have not copied this behaviour.
-If t opcodes `8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will set
-`vF` to zero after execution (even if `vF` is the parameter `X`).
-If nil opcodes `8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will
-leave `vF` unchanged (unless `vF` is the parameter `X`).")
+coprocessor. Later interpreters have not copied this behaviour. If `t`
+opcodes `8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will set `vF` to
+zero after execution (even if `vF` is the parameter `X`). If `nil`
+opcodes `8XY1`, `8XY2` and `8XY3` (OR, AND and XOR) will leave `vF`
+unchanged (unless `vF` is the parameter `X`). This is also known as
+`logic` quirk.")
   (count-collisions t :documentation "On the original Cosmac VIP
 interpreter, would set the `vF` register to 0x1 when a collision
 was detected after `DXYN` instruction. The Superchip 1.1
@@ -487,8 +488,8 @@ plus the number of the rows clipped at the bottom border."))
    :wrap nil
    :jump nil
    :vblank t
-   :logic t
-   :count-collisions nil)
+   :vf-reset t                          ; also known as logic quirk
+   :count-collisions t)
   "Quirks of original Cosmac VIP CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
 
@@ -500,7 +501,7 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
    :wrap nil
    :jump nil
    :vblank nil
-   :logic nil
+   :vf-reset nil                        ; also known as logic quirk
    :count-collisions nil)
   "Quirks of Modern CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
@@ -513,7 +514,7 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
    :wrap nil
    :jump t
    :vblank nil
-   :logic nil
+   :vf-reset nil                        ; also known as logic quirk
    :count-collisions t)
   "Quirks of Superchip CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
@@ -526,7 +527,7 @@ See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.jso
    :wrap t
    :jump nil
    :vblank nil
-   :logic nil
+   :vf-reset nil                        ; also known as logic quirk
    :count-collisions t)
   "Quirks of XO-CHIP CHIP-8 implementation.
 See https://github.com/chip-8/chip-8-database/blob/master/database/platforms.json")
@@ -1023,8 +1024,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set Vx = Vx OR Vy.
           (setf (chip8--vx emulator nimbles) (logior (chip8--vx emulator nimbles)
                                                      (chip8--vy emulator nimbles)))
-          ;; Quirk https://chip8.gulrak.net/#quirk4
-          (when (chip8-quirks-logic (chip8-quirks emulator))
+          ;; Quirk https://chip8.gulrak.net/#quirk5
+          (when (chip8-quirks-vf-reset (chip8-quirks emulator))
             (setf (chip8--vf emulator) #x0))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x2)
@@ -1032,8 +1033,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set Vx = Vx AND Vy.
           (setf (chip8--vx emulator nimbles) (logand (chip8--vx emulator nimbles)
                                                      (chip8--vy emulator nimbles)))
-          ;; Quirk https://chip8.gulrak.net/#quirk4
-          (when (chip8-quirks-logic (chip8-quirks emulator))
+          ;; Quirk https://chip8.gulrak.net/#quirk5
+          (when (chip8-quirks-vf-reset (chip8-quirks emulator))
             (setf (chip8--vf emulator) #x0))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x3)
@@ -1041,8 +1042,8 @@ Switch to CHIP-8 buffer when SWITCH-TO-BUFFER-P is \\='t'."
           ;; Set Vx = Vx XOR Vy.
           (setf (chip8--vx emulator nimbles) (logxor (chip8--vx emulator nimbles)
                                                      (chip8--vy emulator nimbles)))
-          ;; Quirk https://chip8.gulrak.net/#quirk4
-          (when (chip8-quirks-logic (chip8-quirks emulator))
+          ;; Quirk https://chip8.gulrak.net/#quirk5
+          (when (chip8-quirks-vf-reset (chip8-quirks emulator))
             (setf (chip8--vf emulator) #x0))
           (cl-incf (chip8-pc emulator) 2))
          ((eq last-nimble #x4)
